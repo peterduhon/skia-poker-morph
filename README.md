@@ -43,11 +43,90 @@ We use GitHub Issues to track development tickets and spikes. Each ticket or spi
 
 ## Getting Started
 
-1. Clone the repository: `git clone https://github.com/peterduhon/skia-poker-morph.git`
-2. Install the necessary dependencies for the frontend and backend (instructions to be added)
-3. Set up the development environment (instructions to be added)
-4. Compile and deploy the smart contracts (instructions to be added)
-5. Run the frontend and backend applications (instructions to be added)
+1. **Clone the repository:**
+   - Use the following command to clone the repository to your local machine:
+     ```bash
+     git clone https://github.com/peterduhon/skia-poker-morph.git
+     ```
+   - Navigate to the project directory:
+     ```bash
+     cd skia-poker-morph
+     ```
+
+2. **Install the necessary dependencies for the frontend:**
+   - Navigate to the `frontend/` directory:
+     ```bash
+     cd frontend
+     ```
+   - Install the required npm packages:
+     ```bash
+     npm install
+     ```
+   - Return to the main project directory:
+     ```bash
+     cd ..
+     ```
+
+3. **Install the necessary dependencies for the backend:**
+   - Navigate to the `backend/` directory:
+     ```bash
+     cd backend
+     ```
+   - Install the required npm packages (or other package manager if applicable):
+     ```bash
+     npm install
+     ```
+   - Return to the main project directory:
+     ```bash
+     cd ..
+     ```
+
+4. **Set up the development environment:**
+   - Ensure you have the necessary tools installed, such as Node.js, npm, and a Solidity development environment like Hardhat or Truffle.
+   - Configure environment variables (if applicable) in a `.env` file. Example:
+     ```env
+     REACT_APP_WEB3AUTH_CLIENT_ID=your_web3auth_client_id
+     REACT_APP_CHAIN_ID=your_chain_id
+     ```
+   - For backend services, configure any necessary API keys or database connections.
+
+5. **Compile and deploy the smart contracts:**
+   - Navigate to the `contracts/` directory:
+     ```bash
+     cd contracts
+     ```
+   - Compile the smart contracts:
+     ```bash
+     npx hardhat compile
+     ```
+   - Deploy the contracts to the Morph zkEVM testnet:
+     ```bash
+     npx hardhat run scripts/deploy.js --network testnet
+     ```
+   - Ensure to replace `testnet` with the actual network configuration if using a different network.
+
+6. **Run the frontend application:**
+   - Navigate back to the `frontend/` directory:
+     ```bash
+     cd frontend
+     ```
+   - Start the development server:
+     ```bash
+     npm start
+     ```
+
+7. **Run the backend application (if applicable):**
+   - Navigate to the `backend/` directory:
+     ```bash
+     cd backend
+     ```
+   - Start the backend server:
+     ```bash
+     npm start
+     ```
+
+8. **Access the application:**
+   - Once the frontend server is running, open your web browser and navigate to `http://localhost:3000` to see the Skia Poker interface.
 
 ## Contributing
 
