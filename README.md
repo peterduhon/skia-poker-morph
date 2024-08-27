@@ -1,14 +1,21 @@
-# Skia Poker Morph
+# Skia Poker
 
 Skia Poker is a decentralized poker game built on the Morph zkEVM platform, leveraging blockchain technology and zero-knowledge proofs to provide a fair, secure, and transparent gaming experience. The project aims to revolutionize the online poker landscape by addressing the challenges of fraud and trust in traditional Web2 poker platforms.
 
 ## Project Goals
 
+### PRD1
 - Develop a fully decentralized poker game with smart contracts managing gameplay and player interactions
 - Integrate Chainlink VRF for provably fair random number generation
 - Create an intuitive and responsive user interface for seamless gameplay
 - Ensure compatibility with popular Web3 wallets (MetaMask, Coinbase, Rainbow) for secure authentication and transactions
-- Implement advanced features such as AI-powered opponents, secure messaging, and cross-chain capabilities
+- Implement Web3Auth for a seamless and secure authentication experience
+
+### PRD2
+- Introduce AI-powered opponents using Galadriel AI for challenging gameplay
+- Implement secure messaging using XMTP for player communication
+- Integrate POKT Network for decentralized infrastructure and improved performance
+- Explore cross-chain capabilities with Axelar Network for asset transfer and interoperability
 
 ## Technology Stack
 
@@ -27,7 +34,12 @@ Skia Poker is a decentralized poker game built on the Morph zkEVM platform, leve
 - `contracts/`: Solidity smart contracts for gameplay and player management
 - `frontend/`: React frontend code for the user interface
 - `backend/`: Backend services and APIs (if applicable)
-- `docs/`: Project documentation, including PRDs, meeting notes, and research spikes
+- `docs/`: Project documentation, including meeting notes and research spikes
+- `resources/`: Project resources, including PRDs, project brief, and coding resource document
+
+## Development Tracking
+
+We use GitHub Issues to track development tickets and spikes. Each ticket or spike will be created as an issue, assigned to the appropriate team member, and labeled accordingly. Progress and discussions related to each ticket or spike will be managed within the respective issue.
 
 ## Getting Started
 
@@ -56,7 +68,7 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 
 If you have any questions, suggestions, or feedback, please feel free to reach out to the project maintainers:
 
-- Pete (Product Manager): [email@example.com](mailto:peterduhon@gmail.com)
-
+- Pete (Product Manager): [email@example.com](mailto:email@example.com)
+- James (Full Stack Developer): [email@example.com](mailto:email@example.com)
 
 Let's revolutionize the online poker experience together with Skia Poker!
