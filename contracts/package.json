@@ -1,0 +1,10 @@
+{
+  "name": "hardhat-project",
+  "devDependencies": {
+    "@chainlink/contracts": "^1.2.0",
+    "hardhat": "^2.22.9"
+  },
+  "dependencies": {
+    "ethers": "^5.7.2"
+  }
+}
