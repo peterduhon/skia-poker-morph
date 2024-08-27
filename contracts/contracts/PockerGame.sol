@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.24;
 
-import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+pragma solidity ^0.8.19;
+
+import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
 
 contract PokerGame is VRFConsumerBase {
     // Chainlink VRF variables
@@ -15,28 +16,36 @@ contract PokerGame is VRFConsumerBase {
     bool public gameActive;
     uint256 public currentPlayerIndex;
     uint256[] public deck;
+    mapping(bytes32 => bool) public pendingRequests;
 
     // Player data
     struct Player {
         address addr;
         uint256 balance;
         bool registered;
-        Card[] hand;
+        bool folded;
+        Card[] hand;  // Each player has a hand of two cards
     }
     mapping(address => Player) public players;
     address[] public playerAddresses;
 
-    // Card structure
+    // Card suits and values using enums
+    enum Suit { Spades, Hearts, Diamonds, Clubs }
+    enum Value { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace }
+
+    // Card structure using enums
     struct Card {
-        uint8 suit;   // 0 = Spades, 1 = Hearts, 2 = Diamonds, 3 = Clubs
-        uint8 value;  // 2-14 (11=Jack, 12=Queen, 13=King, 14=Ace)
+        Suit suit;
+        Value value;
     }
 
     // Events
     event PlayerRegistered(address player);
-    event CardDealt(address player, uint256 card);
+    event CardDealt(address player, Card card);
     event TurnManaged(address player);
     event WinnerDeclared(address winner);
+    event RandomnessRequested(bytes32 requestId);
+    event RandomnessFailed(bytes32 requestId);
 
     // Constructor
     constructor(
@@ -52,7 +61,7 @@ contract PokerGame is VRFConsumerBase {
         initializeDeck();
     }
 
-    // Modifier to restrict access
+    // Modifiers for validation
     modifier onlyOwner() {
         require(msg.sender == owner, "Only the owner can call this function");
         _;
@@ -63,20 +72,41 @@ contract PokerGame is VRFConsumerBase {
         _;
     }
 
-    // Player Registration
-    function registerPlayer() external {
+    modifier isPlayer() {
+        require(players[msg.sender].registered, "Player is not registered");
+        _;
+    }
+
+    modifier isEOA() {
+        require(msg.sender.code.length == 0, "Only EOA can call this function");
+        _;
+    }
+
+    modifier nonReentrant() {
+        require(!reentrant, "Reentrancy detected");
+        reentrant = true;
+        _;
+        reentrant = false;
+    }
+
+    bool private reentrant;  // State variable to track reentrancy
+
+    // Player Registration with EOA Check
+    function registerPlayer() external isEOA {
         require(!players[msg.sender].registered, "Player already registered");
-        
+
         players[msg.sender] = Player({
             addr: msg.sender,
             balance: 0,
             registered: true,
-            hand: new Card 
+            folded: false,
+            hand: Card[]
         });
 
         playerAddresses.push(msg.sender);
         emit PlayerRegistered(msg.sender);
     }
+
 
     // Start the Game
     function startGame() external onlyOwner {
@@ -88,7 +118,9 @@ contract PokerGame is VRFConsumerBase {
         currentPlayerIndex = 0;
 
         collectBuyIns();
-        requestRandomness(keyHash, fee);
+        bytes32 requestId = requestRandomness(keyHash, fee);
+        pendingRequests[requestId] = true;
+        emit RandomnessRequested(requestId);
     }
 
     // Collect Buy-ins
@@ -101,15 +133,51 @@ contract PokerGame is VRFConsumerBase {
         }
     }
 
-    // Deal Cards
+    // Manage Player's Turn with Validation
+    function manageTurn() external isGameActive isPlayer {
+        require(msg.sender == playerAddresses[currentPlayerIndex], "Not your turn to play");
+        require(players[msg.sender].balance > 0, "Insufficient balance to play");
+        require(!players[msg.sender].folded, "Player has already folded");
+
+        // Logic for managing player's turn (e.g., betting, folding)
+        // ...
+
+        emit TurnManaged(msg.sender);
+        nextPlayerTurn();
+    }
+
+    // Fulfill Randomness Callback with Error Handling
+    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
+        if (!pendingRequests[requestId] || !gameActive) {
+            emit RandomnessFailed(requestId);
+            return; // Request ID is not recognized or game is inactive
+        }
+
+        pendingRequests[requestId] = false; // Mark the request as fulfilled
+        dealCards(randomness);
+    }
+
+    // Timeout or Fallback Mechanism for Randomness Request
+    function handleRandomnessTimeout(bytes32 requestId) external onlyOwner {
+        require(pendingRequests[requestId], "Request ID not pending");
+        pendingRequests[requestId] = false;
+
+        // Fallback logic to handle timeout (e.g., retry request, declare a draw, etc.)
+        // ...
+
+        emit RandomnessFailed(requestId);
+    }
+
+    // Deal Cards to Players
     function dealCards(uint256 randomness) internal isGameActive {
         shuffleDeck(randomness);
 
         for (uint256 i = 0; i < playerAddresses.length; i++) {
             address player = playerAddresses[i];
             players[player].hand.push(drawCard());
-            players[player].hand.push(drawCard());
-            emit CardDealt(player, 2); // Assume 2 cards dealt
+            players[player].hand.push(drawCard()); // Dealing two cards per player
+            emit CardDealt(player, players[player].hand[0]);
+            emit CardDealt(player, players[player].hand[1]);
         }
     }
 
@@ -117,7 +185,7 @@ contract PokerGame is VRFConsumerBase {
     function drawCard() internal returns (Card memory) {
         uint256 cardIndex = deck[deck.length - 1];
         deck.pop();
-        return Card(uint8(cardIndex / 13), uint8(cardIndex % 13) + 2);
+        return Card(Suit(cardIndex / 13), Value(cardIndex % 13));
     }
 
     // Shuffle the deck using randomness
@@ -129,18 +197,6 @@ contract PokerGame is VRFConsumerBase {
             deck[i] = temp;
             randomness = randomness / 52;
         }
-    }
-
-    // Fulfill Randomness Callback
-    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
-        dealCards(randomness);
-    }
-
-    // Player Turn Management
-    function manageTurn() external isGameActive {
-        require(msg.sender == playerAddresses[currentPlayerIndex], "Not your turn to play");
-        emit TurnManaged(msg.sender);
-        nextPlayerTurn();
     }
 
     // Move to the next player's turn
@@ -168,9 +224,27 @@ contract PokerGame is VRFConsumerBase {
 
     // Initialize the deck with 52 cards
     function initializeDeck() internal {
-        deck = new uint256 ;
         for (uint256 i = 0; i < 52; i++) {
-            deck[i] = i; // 0-51 representing a deck of cards
+            deck.push(i); // 0-51 representing a deck of cards
         }
     }
+
+    // Helper functions to evaluate poker hands
+    function isFlush(Card[] memory hand) internal pure returns (bool) {
+        Suit firstSuit = hand[0].suit;
+        for (uint256 i = 1; i < hand.length; i++) {
+            if (hand[i].suit != firstSuit) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function isStraight(Card[] memory hand) internal pure returns (bool) {
+        // Sort the hand by value and check consecutive values
+        // Implement sorting logic and straight check
+        return true; // Placeholder
+    }
+
+    // More helper functions for other hand types can be added similarly
 }
