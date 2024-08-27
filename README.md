@@ -31,7 +31,7 @@ Skia Poker is a decentralized poker game built on the Morph zkEVM platform, leve
 
 ## Getting Started
 
-1. Clone the repository: `git clone https://github.com/your-username/skia-poker.git`
+1. Clone the repository: `git clone https://github.com/peterduhon/skia-poker-morph.git`
 2. Install the necessary dependencies for the frontend and backend (instructions to be added)
 3. Set up the development environment (instructions to be added)
 4. Compile and deploy the smart contracts (instructions to be added)
