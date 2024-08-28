@@ -1,0 +1,40 @@
+### **Meeting Summary and Key Action Points**
+
+#### **Meeting 1: Team Discussion with Buddy and Tatiana**
+
+1. **Introduction and Roles:**  
+   * **Tatiana:** Full-stack developer with experience in JS, TypeScript, and React. Currently focused on developing the GameLogic smart contract (SP-2) and working on a prototype for integrating front-end with smart contracts.  
+   * **Buddy:** UI/UX lead, working on wireframes and the core user interface components for Skia Poker.  
+2. **Feedback on Tatiana's Progress:**  
+   * Tatiana is working on the GameLogic smart contract but needs guidance on testing smart contracts. James will assist her with this process.  
+   * Tatiana's current focus is on updating her code based on feedback and working closely with James to ensure proper testing and functionality.  
+3. **Next Steps:**  
+   * Tatiana will update her code according to the feedback provided.  
+   * James will help Tatiana with testing smart contracts.  
+   * The team will integrate the UI work by Buddy with the backend logic being developed by Tatiana and James.  
+4. **Discussion on Integration:**  
+   * The importance of syncing the work between the UI/UX and smart contract teams was highlighted.  
+   * A new front-end developer may join to handle the Web3 authentication integration, which will complement Buddy’s work on the UI.
+
+#### **Meeting 2: One-on-One with Jayanth Koppola (Fakename)**
+
+1. **Introduction to the Project:**  
+   * **Jayanth Koppola:** Tasked with handling Web3Auth integration, and will potentially assist in integrating front-end with back-end, particularly for Web3Auth and related authentication features.  
+2. **Project Overview and Tasks:**  
+   * The primary task for Jayanth is the Web3Auth integration (SP-6), ensuring a smooth and secure user authentication process.  
+   * Jayanth will review the documentation and existing code to understand the current state of the project and proceed with the integration.  
+3. **Alignment with Other Team Members:**  
+   * Jayanth will need to work closely with Buddy on UI/UX and ensure that the Web3Auth integration aligns with the overall front-end strategy.  
+   * Coordination with James and Tatiana will also be essential, especially if any back-end logic needs to interface with the Web3 authentication.  
+4. **Next Steps:**  
+   * Jayanth will start by reviewing the documentation and existing code.  
+   * He will raise any questions or doubts after reviewing the docs, and then begin the integration process for Web3Auth.  
+   * Regular updates will be shared with the team to ensure alignment.
+
+### **Key Points and Action Items:**
+
+1. **Tatiana:** Continue with GameLogic development (SP-2) and work with James on testing.  
+2. **Buddy:** Continue UI/UX work, especially on wireframes and core UI elements. Ensure alignment with backend logic.  
+3. **James:** Focus on completing PlayerManagement (SP-3) and assist Tatiana with testing the GameLogic contract.  
+4. **Jayanth (Fakename):** Focus on Web3Auth integration (SP-6), ensuring it aligns with the existing front-end work and backend requirements.
+
