@@ -1,7 +1,7 @@
 import "./community.scss";
 
 // eslint-disable-next-line react/prop-types
-export const CommunityCards = ({ cards = [] }) => {
+export const CommunityCards = ({ cards = ["df", "ff"] }) => {
   return (
     <div className="community">
       {cards?.map((card) => (
