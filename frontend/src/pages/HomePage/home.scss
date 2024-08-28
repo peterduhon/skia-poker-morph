@@ -1,0 +1,11 @@
+.home {
+  margin-top: 50px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+
+  &__button {
+    background-color: peru;
+    padding: 15px;
+  }
+}

@@ -1,0 +1,17 @@
+.player {
+  &__cards {
+    display: flex;
+    gap: 2px;
+  }
+
+  &__card {
+    height: 20px;
+    width: 10px;
+    background-color: pink;
+  }
+
+  &__img {
+    width: 20px;
+    height: 20px;
+  }
+}
