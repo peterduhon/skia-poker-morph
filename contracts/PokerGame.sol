@@ -198,8 +198,9 @@ SidePot[] public sidePots;
 
     // Manage Player's Turn with Validation
     function manageTurn(uint256 betAmount) external isGameActive isPlayer {
-        require(msg.sender == playerAddresses[currentPlayerIndex], "PokerGame: Not your turn to play");
-        require(!players[msg.sender].folded, "PokerGame: Player has already folded");
+
+    require(msg.sender == playerAddresses[currentPlayerIndex], "PokerGame: It's not your turn to play. Please wait for your turn.");
+    require(!players[msg.sender].folded, "PokerGame: You have already folded and cannot take any more actions in this hand.");
 
         // Handle different actions
         if (betAmount == 0) {
@@ -217,8 +218,8 @@ SidePot[] public sidePots;
     }
 
     function placeBet(uint256 amount) public isGameActive isPlayer {
-        require(amount >= currentRound.betAmount, "PokerGame: Bet amount too low");
-        require(players[msg.sender].balance >= amount, "PokerGame: Player doesn't have sufficient balance");
+        require(amount >= currentRound.betAmount, "PokerGame: Bet amount too low. Minimum bet: {currentRound.betAmount}, Your bet: {amount}");
+    require(players[msg.sender].balance >= amount, "PokerGame: Insufficient balance. Required: {amount}, Your balance: {players[msg.sender].balance}");
 
         players[msg.sender].balance -= amount;
         currentRound.playerBets[msg.sender] += amount;
@@ -244,7 +245,7 @@ SidePot[] public sidePots;
     }
 
     function raise(uint256 amount) internal {
-        require(amount > currentRound.betAmount, "PokerGame: Raise amount too low");
+        require(amount > currentRound.betAmount, "PokerGame: Raise amount must be greater than the current bet. Your raise: {amount}, Current bet: {currentRound.betAmount}");
         uint256 raiseAmount = amount - currentRound.betAmount;
         players[msg.sender].balance -= amount;
         currentRound.playerBets[msg.sender] += amount;
@@ -270,7 +271,7 @@ SidePot[] public sidePots;
     player.isAllIn = true;
     }
 
-    function isPair(Card[] memory hand) internal pure returns (bool) {
+    function isOnePair(Card[] memory hand) internal pure returns (bool) {
     for (uint i = 0; i < hand.length - 1; i++) {
         for (uint j = i + 1; j < hand.length; j++) {
             if (hand[i].value == hand[j].value) {
@@ -305,19 +306,20 @@ function isStraight(Card[] memory hand) internal pure returns (bool) {
 
 function isFlush(Card[] memory hand) internal pure returns (bool) {
     uint8[4] memory suitCounts;
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         suitCounts[uint8(hand[i].suit)]++;
         if (suitCounts[uint8(hand[i].suit)] == 5) {
             return true;
         }
     }
     return false;
+
 }
 
-function isRoalFlush(Card[] memory hand)internal pure returns (bool){
+function isRoyalFlush(Card[] memory hand)internal pure returns (bool){
     Suit suit = hand[0].suit;
     Value[] memory values = new Value[](4);
-    for (uint i = 1; i < 5; i++) {
+    for (uint8 i = 1; i < 5; i++) {
         values[i] = hand[i].value;
         if (hand[i].suit != suit) {
             return false;
@@ -325,7 +327,7 @@ function isRoalFlush(Card[] memory hand)internal pure returns (bool){
     }
      values = values.sort();
     
-    for (uint i = 0; i < 5; i++) {
+    for (uint8 i = 0; i < 5; i++) {
         if (values[0]!=Value.Ace) {
             return false;
         }
@@ -345,7 +347,7 @@ function isRoalFlush(Card[] memory hand)internal pure returns (bool){
 
 function isStraightFlush(Card[] memory hand)internal pure returns (bool){
     Suit suit = hand[0].suit;
-    int[] values = new Value[](13);
+    uint8[] values = new uint8[](13);
     
     for (uint i = 1; i < 5; i++) {
         values[i] = hand[i].value;
@@ -355,7 +357,7 @@ function isStraightFlush(Card[] memory hand)internal pure returns (bool){
     }
 
     uint8[13] memory valueCounts;
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         valueCounts[uint8(hand[i].value)]++;
     }
     
@@ -373,7 +375,7 @@ function isStraightFlush(Card[] memory hand)internal pure returns (bool){
 
 function isFourOfAKind(Card[] memory hand)internal pure returns (bool){
 uint8[4] memory suitCounts;
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         suitCounts[uint8(hand[i].suit)]++;
         if (suitCounts[uint8(hand[i].suit)]==4){
             return true;
@@ -387,7 +389,7 @@ uint8[4] memory suitCounts;
 function isFullHouse(Card[] memory hand)internal pure returns (bool){
      uint8[4] memory suitCounts;
      bool hasThreeOfAKind = false;
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         suitCounts[uint8(hand[i].suit)]++;
         if (suitCounts[uint8(hand[i].suit)]==3){
             hasThreeOfAKind=true;
@@ -414,7 +416,7 @@ function isFullHouse(Card[] memory hand)internal pure returns (bool){
 function isThreeOfKind(Card[] memory hand) public pure returns (bool) {
     
     uint8[4] memory suitCounts;
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         suitCounts[uint8(hand[i].suit)]++;
         if (suitCounts[uint8(hand[i].suit)]==3){
             return true;
@@ -430,7 +432,7 @@ bool pair1Found = false;
     Value pair1Value;
     Value pair2Value;
       uint8[4] memory suitCounts;
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         suitCounts[uint8(hand[i].suit)]++;
         if (suitCounts[uint8(hand[i].suit)]==2){
             pair1Found = true;
@@ -453,13 +455,28 @@ bool pair1Found = false;
    
     return pair1Found && pair2Found;
 }
+function getHighCard(Card[] memory hand) internal pure returns (uint256) {
+    uint256 highCardValue = 0;
+    for (uint256 i = 0; i < hand.length; i++) {
+        if (uint256(hand[i].value) > highCardValue) {
+            highCardValue = uint256(hand[i].value);
+        }
+    }
+    return highCardValue;
+}
 
 function getHighCardValue(Card[] memory hand) internal pure returns (uint256) {
-    uint256 value = 0;
-    for (uint i = 0; i < hand.length; i++) {
-        value = value * 13 + uint256(hand[i].value);
+   uint256 value;
+    assembly {
+        let len := mload(hand)
+        for { let i := 0 } lt(i, len) { i := add(i, 1) }
+        {
+            let card := mload(add(add(hand, 0x20), mul(i, 0x20)))
+            value := add(mul(value, 13), mod(card, 13))
+        }
     }
     return value;
+
 }
 
 function getPairValue(Card[] memory hand) internal pure returns (uint256) {
@@ -716,7 +733,8 @@ function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
     }
 
     function dealCommunityCards() internal {
-    require(currentPhase != GamePhase.PreFlop && currentPhase != GamePhase.Showdown, "Invalid game phase for dealing community cards");
+     require(currentPhase != GamePhase.PreFlop && currentPhase != GamePhase.Showdown, 
+        "PokerGame: Cannot deal community cards in PreFlop or Showdown phase. Current phase: {uint(currentPhase)}");
     
     uint256 cardsToDeal;
     if (currentPhase == GamePhase.Flop) {
@@ -777,12 +795,13 @@ function resetBettingRound() internal {
     }
 
     function shuffleDeck(uint256 randomness) internal {
-        // Implementation of shuffle deck using randomness
-        uint256 length = deck.length;
-        for (uint256 i = 0; i < length; i++) {
-            uint256 j = (randomness % (length - i)) + i;
-            (deck[i], deck[j]) = (deck[j], deck[i]);
-        }
+       uint256[52] memory tempDeck = deck;
+    for (uint256 i = 0; i < 52; i++) {
+        uint256 j = (randomness % (52 - i)) + i;
+        (tempDeck[i], tempDeck[j]) = (tempDeck[j], tempDeck[i]);
+    }
+    deck = tempDeck;
+       
     }
 
     function initializeDeck() internal {
@@ -806,7 +825,7 @@ function resetBettingRound() internal {
     }
 
     function evaluateHand(Card[] memory hand) internal pure returns (uint256) {
-     require(hand.length == 7, "Hand must contain 7 cards");
+     require(hand.length == 7, "PokerGame: Invalid hand size. Expected 7 cards, got {hand.length}");
 
     if (isRoyalFlush(hand)) return uint256(HandRanking.RoyalFlush) * 1000000 + getHighCard(hand);
     if (isStraightFlush(hand)) return uint256(HandRanking.StraightFlush) * 1000000 + getHighCard(hand);
@@ -816,7 +835,7 @@ function resetBettingRound() internal {
     if (isStraight(hand)) return uint256(HandRanking.Straight) * 1000000 + getStraightValue(hand);
     if (isThreeOfAKind(hand)) return uint256(HandRanking.ThreeOfAKind) * 1000000 + getThreeOfAKindValue(hand);
     if (isTwoPairs(hand)) return uint256(HandRanking.TwoPairs) * 1000000 + getTwoPairsValue(hand);
-    if (isPair(hand)) return uint256(HandRanking.Pair) * 1000000 + getPairValue(hand);
+    if (isOnePair(hand)) return uint256(HandRanking.Pair) * 1000000 + getPairValue(hand);
     
     return uint256(HandRanking.HighCard) * 1000000 + getHighCardValue(hand);
 
