@@ -415,10 +415,10 @@ function isFullHouse(Card[] memory hand)internal pure returns (bool){
 
 function isThreeOfKind(Card[] memory hand) public pure returns (bool) {
     
-    uint8[4] memory suitCounts;
+    uint8[4] memory valueCounts;
     for (uint8 i = 0; i < hand.length; i++) {
-        suitCounts[uint8(hand[i].suit)]++;
-        if (suitCounts[uint8(hand[i].suit)]==3){
+        valueCounts[uint8(hand[i].value)]++;
+        if (valueCounts[uint8(hand[i].value)]==3){
             return true;
         }
     }
