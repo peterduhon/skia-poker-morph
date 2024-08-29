@@ -22,6 +22,10 @@ contract GameManagement is Ownable {
     event GameRoomCreated(uint256 indexed gameId, address indexed creator, uint256 buyInAmount, uint256 maxPlayers);
     event GameRoomStatusUpdated(uint256 indexed gameId, GameStatus newStatus);
 
+    constructor() {
+        nextGameId = 0;
+    }
+    
     function createGameRoom(uint256 _buyInAmount, uint256 _maxPlayers) external onlyOwner {
         require(_buyInAmount > 0, "Buy-in amount must be greater than 0");
         require(_maxPlayers > 1, "Number of players must be greater than 1");

@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 contract UserManagement {
     struct User {
+        address userAddress;
         string username;
         uint256 balance;
     }
@@ -17,6 +18,7 @@ contract UserManagement {
         require(msg.value > 0, "Initial balance must be greater than 0");
 
         users[msg.sender] = User({
+            userAddress: msg.sender,
             username: _username,
             balance: msg.value
         });
