@@ -12,7 +12,7 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
 
     // Game state variables
     uint256 public buyInAmount;
-    uint256 public currentPot;
+    uint256 public currentBet;
     bool public gameActive;
     uint256 public currentPlayerIndex;
     uint256[] public deck;
@@ -33,6 +33,12 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         StraightFlush,
         RoyalFlush
     }
+    enum PlayerAction { Begin, Fold, Raise, Call, Check, AllIn }
+    enum GamePhase { PreFlop, Flop, Turn, River, Showdown }
+
+    GamePhase public currentPhase;
+    Card[5] public communityCards;
+    uint256 public communityCardCount;
 
     // Card structure using enums
     struct Card {
@@ -45,7 +51,7 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         address addr;
         uint256 balance;
         bool registered;
-        bool folded;
+        PlayerAction action;
         bool isAllIn;
         Card[] hand;  // Each player has a hand of two cards
     }
@@ -63,13 +69,12 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
     uint256 public roundNumber;
 
     // Improved Betting Logic
-    struct Pot {
+    struct SidePot {
         uint256 amount;
         address[] eligiblePlayers;
     }
-
-    Pot public mainPot;
-    Pot[] public sidePots;
+    uint256 public mainPot;
+    SidePot[] public sidePots;
 
     // Events
     event PlayerRegistered(address indexed player);
@@ -86,8 +91,9 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
     event NewRoundStarted(uint256 roundNumber);
     event RoundEnded(uint256 roundNumber);
     event GameStarted();
-    event GameEnded(address indexed winner);
-
+    event GameEnded(address[] winner);
+    event GamePhaseAdvanced(GamePhase newPhase);
+    
     // Constructor
     constructor(
         address _vrfCoordinator,
@@ -112,6 +118,11 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         _;
     }
 
+    modifier isActivePlayer(address player) {
+        require(players[player].action != PlayerAction.Fold, "Poker Game : Player has folded.");
+        _;
+    }
+
     modifier isEOA() {
         require(msg.sender.code.length == 0, "PokerGame: Only EOA can call this function");
         _;
@@ -124,7 +135,7 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         players[msg.sender].addr = msg.sender;
         players[msg.sender].balance = 0;
         players[msg.sender].registered = true;
-        players[msg.sender].folded = false;
+        players[msg.sender].action = PlayerAction.Begin;
         players[msg.sender].isAllIn = false;
 
         playerAddresses.push(msg.sender);
@@ -137,8 +148,10 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         require(playerAddresses.length > 1, "PokerGame: Not enough players to start the game");
         
         gameActive = true;
-        currentPot = 0;
+        currentBet = 0;
         currentPlayerIndex = 0;
+        currentPhase = GamePhase.PreFlop;
+        communityCardCount = 0;
 
         collectBuyIns();
         bytes32 requestId = requestRandomness(keyHash, fee);
@@ -153,20 +166,75 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
             address player = playerAddresses[i];
             require(players[player].balance >= buyInAmount, "PokerGame: Player doesn't have sufficient balance for buy-in");
             players[player].balance -= buyInAmount;
-            currentPot += buyInAmount;
+            currentBet += buyInAmount;
         }
+    }
+
+   function resetRound() internal {
+        currentRound.betAmount = 0;
+        currentRound.totalPot = 0;
+        delete currentRound.activePlayers;
+        for (uint256 i = 0; i < playerAddresses.length; i++) {
+            players[playerAddresses[i]].action = PlayerAction.Begin;
+        }
+    }
+    
+    function endCurrentRound() internal onlyOwner isGameActive {
+        require(currentRound.activePlayers.length > 1, "PokerGame: Not enough players to continue.");
+
+        address[] memory activePlayers = currentRound.activePlayers;
+
+        if (activePlayers.length == 1) {
+            address winner = activePlayers[0];
+            players[winner].balance += currentRound.totalPot;
+            emit WinnerDeclared(winner);
+            gameActive = false;
+        } else {
+            mainPot += currentRound.totalPot;
+        }
+
+        resetRound();
+        emit RoundEnded(roundNumber);
+        roundNumber++;
+    }
+
+    function advancePhase() external onlyOwner {
+        require(currentPhase != GamePhase.Showdown, "Poker Game : Game is already in showdown phase");
+
+        if (currentPhase == GamePhase.PreFlop) {
+            currentPhase = GamePhase.Flop;
+            dealCommunityCards(3);
+        } else if (currentPhase == GamePhase.Flop) {
+            currentPhase = GamePhase.Turn;
+            dealCommunityCards(1);
+        } else if (currentPhase == GamePhase.Turn) {
+            currentPhase = GamePhase.River;
+            dealCommunityCards(1);
+        } else if (currentPhase == GamePhase.River) {
+            currentPhase = GamePhase.Showdown;
+        }
+
+        emit GamePhaseAdvanced(currentPhase);
+        // Reset betting for the new phase
+        resetBettingRound();
     }
 
     // Manage Player's Turn with Validation
     function manageTurn(uint256 betAmount) external isGameActive isPlayer nonReentrant {
         require(msg.sender == playerAddresses[currentPlayerIndex], "PokerGame: Not your turn to play");
-        require(!players[msg.sender].folded, "PokerGame: Player has already folded");
+        
+        Player storage player = players[msg.sender];
+
+        require(player.action != PlayerAction.Fold, "PokerGame: Player has already folded");
 
         if (betAmount == 0) {
-            fold();
+            player.action = PlayerAction.Check;
+            // Proceed to the next player
         } else if (betAmount == currentRound.betAmount) {
+            player.action = PlayerAction.Call;
             call();
         } else if (betAmount > currentRound.betAmount) {
+            player.action = PlayerAction.Raise;
             raise(betAmount);
         } else {
             revert("PokerGame: Invalid bet amount");
@@ -176,13 +244,34 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         nextPlayerTurn();
     }
 
+    // Check if the round is over
+    function isRoundOver() internal view returns (bool) {
+        for (uint256 i = 0; i < currentRound.activePlayers.length; i++) {
+            if (players[currentRound.activePlayers[i]].action != PlayerAction.Fold) {
+                return false;
+            }
+        }
+        return true;
+    }
+ 
+    // Move to the next player's turn
     function nextPlayerTurn() internal {
-        currentPlayerIndex = (currentPlayerIndex + 1) % playerAddresses.length;
-        while (players[playerAddresses[currentPlayerIndex]].folded && playerAddresses.length > 1) {
+        if (currentRound.activePlayers.length == 0) {
+            return; // No players in the game
+        }
+
+        uint256 startIndex = currentPlayerIndex;
+        do {
             currentPlayerIndex = (currentPlayerIndex + 1) % playerAddresses.length;
+        } while (players[playerAddresses[currentPlayerIndex]].action == PlayerAction.Fold && currentPlayerIndex != startIndex);
+        
+        // If all players have folded or only one player remains, end the round
+        if (currentRound.activePlayers.length == 1 || isRoundOver()) {
+            endCurrentRound();
         }
     }
 
+    // Place a bet
     function placeBet(uint256 amount) public isGameActive isPlayer nonReentrant {
         require(amount >= currentRound.betAmount, "PokerGame: Bet amount too low");
         require(players[msg.sender].balance >= amount, "PokerGame: Player doesn't have sufficient balance");
@@ -194,14 +283,23 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         emit PlayerBetPlaced(msg.sender, amount);
     }
 
-    function fold() internal {
-        players[msg.sender].folded = true;
+    // Fold the current player's hand
+    function fold() public isGameActive isPlayer nonReentrant {
+        Player storage player = players[msg.sender];
+        require(player.action != PlayerAction.Fold, "PokerGame: Player has already folded");
+        
+        player.action = PlayerAction.Fold;
         removePlayerFromActiveList(msg.sender);
+
         emit PlayerFolded(msg.sender);
+        nextPlayerTurn();
     }
 
+    // Call the current bet amount
     function call() internal {
         uint256 callAmount = currentRound.betAmount - currentRound.playerBets[msg.sender];
+        require(players[msg.sender].balance >= callAmount, "PokerGame: Insufficient balance to call");
+
         players[msg.sender].balance -= callAmount;
         currentRound.playerBets[msg.sender] += callAmount;
         currentRound.totalPot += callAmount;
@@ -209,15 +307,38 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         emit PlayerCalled(msg.sender);
     }
 
+    // Raise the current bet amount
     function raise(uint256 amount) internal {
         require(amount > currentRound.betAmount, "PokerGame: Raise amount too low");
         uint256 raiseAmount = amount - currentRound.betAmount;
+        require(players[msg.sender].balance >= raiseAmount, "PokerGame: Insufficient balance to raise");
+
         players[msg.sender].balance -= raiseAmount;
         currentRound.playerBets[msg.sender] += raiseAmount;
         currentRound.totalPot += raiseAmount;
         currentRound.betAmount = amount;
 
         emit PlayerRaised(msg.sender, raiseAmount);
+    }
+
+    function handleAllIn(address player, uint256 allInAmount) internal {
+        // If player's all-in amount is less than the current bet, create a side pot
+        address[] memory activePlayers = currentRound.activePlayers;
+
+        if (allInAmount < currentBet) {
+            SidePot memory newSidePot;
+            uint index = 0;
+            newSidePot.amount = (currentBet - allInAmount) * (activePlayers.length - 1);
+            for (uint i = 0; i < activePlayers.length; i++) {
+                if (activePlayers[i] != player) {
+                    newSidePot.eligiblePlayers[index++] = activePlayers[i];
+                }
+            }
+            sidePots.push(newSidePot);
+        }
+        // Update main pot and player status
+        mainPot += allInAmount;
+        players[player].action = PlayerAction.AllIn;
     }
 
     function removePlayerFromActiveList(address player) internal {
@@ -241,30 +362,164 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         emit NewRoundStarted(roundNumber);
     }
 
-    function endCurrentRound() external onlyOwner isGameActive {
-        require(currentRound.activePlayers.length > 1, "PokerGame: Not enough players to continue.");
+    function endGame() external onlyOwner isGameActive {
+        require(playerAddresses.length > 1, "PokerGame: Not enough players to end the game.");
 
-        address[] memory activePlayers = currentRound.activePlayers;
-
-        if (activePlayers.length == 1) {
-            address winner = activePlayers[0];
-            players[winner].balance += currentRound.totalPot;
-            emit WinnerDeclared(winner);
-            gameActive = false;
-        } else {
-            mainPot.amount += currentRound.totalPot;
+        // Determine the winning players
+        address[] memory winners = determineWinners();
+        
+        // Split the main pot among all winners
+        uint256 winningAmount = mainPot / winners.length;
+        for (uint256 i = 0; i < winners.length; i++) {
+            payable(winners[i]).transfer(winningAmount);
         }
 
-        resetRound();
-        emit RoundEnded(roundNumber);
-        roundNumber++;
+        // Distribute side pots if any
+        for (uint256 i = 0; i < sidePots.length; i++) {
+            address[] memory sideWinners = determineWinnersForSidePot(sidePots[i].eligiblePlayers);
+            uint256 sideWinningAmount = sidePots[i].amount / sideWinners.length;
+            for (uint256 j = 0; j < sideWinners.length; j++) {
+                payable(sideWinners[j]).transfer(sideWinningAmount);
+            }
+        }
+        
+        // Reset game state
+        delete communityCards;
+        communityCardCount = 0;
+        mainPot = 0;
+        delete sidePots;
+        currentPhase = GamePhase.PreFlop;
+        for (uint256 i = 0; i < playerAddresses.length; i++) {
+            players[playerAddresses[i]].action = PlayerAction.Begin;
+        }
+        
+        emit GameEnded(winners);
     }
 
-    function resetRound() internal {
-        currentRound.betAmount = 0;
-        currentRound.totalPot = 0;
-        delete currentRound.activePlayers;
-        emit RoundEnded(roundNumber);
+    function determineWinners() internal view returns (address[] memory) {
+        uint256 bestHandValue = 0;
+        uint256 winnerCount = 0;
+        
+        // First pass: Find the best hand value
+        for (uint i = 0; i < playerAddresses.length; i++) {
+            address player = playerAddresses[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue > bestHandValue) {
+                    bestHandValue = handValue;
+                    winnerCount = 1;
+                } else if (handValue == bestHandValue) {
+                    winnerCount++;
+                }
+            }
+        }
+        
+        // Second pass: Collect all players with the best hand
+        address[] memory winners = new address[](winnerCount);
+        uint256 index = 0;
+        for (uint i = 0; i < playerAddresses.length; i++) {
+            address player = playerAddresses[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint256 j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue == bestHandValue) {
+                    winners[index] = player;
+                    index++;
+                }
+            }
+        }
+
+        return winners;
+    }
+
+    function determineWinnersForSidePot(address[] memory eligiblePlayers) internal view returns (address[] memory) {
+        uint256 bestHandValue = 0;
+        uint256 winnerCount = 0;
+        
+        // First pass: Find the best hand value
+        for (uint i = 0; i < eligiblePlayers.length; i++) {
+            address player = eligiblePlayers[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint256 j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue > bestHandValue) {
+                    bestHandValue = handValue;
+                    winnerCount = 1;
+                } else if (handValue == bestHandValue) {
+                    winnerCount++;
+                }
+            }
+        }
+        
+        // Second pass: Collect all players with the best hand
+        address[] memory winners = new address[](winnerCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < eligiblePlayers.length; i++) {
+            address player = eligiblePlayers[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint256 j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue == bestHandValue) {
+                    winners[index] = player;
+                    index++;
+                }
+            }
+        }
+
+        return winners;
+    }
+
+    function distributePots() internal {
+        address[] memory mainWinners = determineWinners();
+        uint256 mainPotShare = mainPot / mainWinners.length;
+
+        // Distribute the main pot among all main winners
+        for (uint i = 0; i < mainWinners.length; i++) {
+            payable(mainWinners[i]).transfer(mainPotShare);
+        }
+
+        // Distribute each side pot among the respective side pot winners
+        for (uint i = 0; i < sidePots.length; i++) {
+            address[] memory sideWinners = determineWinnersForSidePot(sidePots[i].eligiblePlayers);
+            uint256 sidePotShare = sidePots[i].amount / sideWinners.length;
+
+            for (uint j = 0; j < sideWinners.length; j++) {
+                payable(sideWinners[j]).transfer(sidePotShare);
+            }
+        }
+    }
+
+    // Shuffle deck using randomness
+    function shuffleDeck(uint256 randomness) internal {
+        for (uint256 i = deck.length - 1; i > 0; i--) {
+            uint256 j = randomness % (i + 1);
+            (deck[i], deck[j]) = (deck[j], deck[i]);
+        }
     }
 
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
@@ -272,17 +527,71 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
             emit RandomnessFailed(requestId);
             return;
         }
-        pendingRequests[requestId] = false;
+        pendingRequests[requestId] = false; // Mark the request as fulfilled
         shuffleDeck(randomness);
         dealCardsToPlayers();
         emit RandomnessReceived(randomness);
     }
+    
+    function removeCardFromDeck() internal {
+        for (uint256 i = 1; i < deck.length; i++) {
+            deck[i - 1] = deck[i];
+        }
+        deck.pop();
+    }
 
-    function shuffleDeck(uint256 randomness) internal {
-        uint256 deckLength = deck.length;
-        for (uint256 i = 0; i < deckLength; i++) {
-            uint256 j = randomness % deckLength;
-            (deck[i], deck[j]) = (deck[j], deck[i]);
+    function drawCard() internal returns (Card memory) {
+        // Replace this with actual card drawing logic
+        Card memory newCard = Card({
+            suit: Suit(deck[0] / 13),
+            value: Value(deck[0] % 13)
+        });
+        removeCardFromDeck();
+        return newCard;
+    }
+
+    function dealCardsToPlayers() internal {
+        require(deck.length >= playerAddresses.length * 2, "PokerGame: Not enough cards in the deck");
+        for (uint256 i = 0; i < playerAddresses.length; i++) {
+            Player storage player = players[playerAddresses[i]];
+            player.hand.push(Card({
+                suit: Suit(deck[0] / 13),
+                value: Value(deck[0] % 13)
+            }));
+            removeCardFromDeck();
+            player.hand.push(Card({
+                suit: Suit(deck[0] / 13),
+                value: Value(deck[0] % 13)
+            }));
+            removeCardFromDeck();
+            emit CardDealt(playerAddresses[i], player.hand[0]);
+            emit CardDealt(playerAddresses[i], player.hand[1]);
+        }
+    }
+
+    function resetBettingRound() internal {
+        currentBet = 0; // Reset the current bet amount
+        for (uint i = 0; i < playerAddresses.length; i++) {
+            currentRound.playerBets[playerAddresses[i]] = 0; // Reset bets for each player
+        }
+        currentPlayerIndex = 0; // Start betting with the first player again
+    }
+
+    function getCommunityCards() external view returns (Card[] memory) {
+        Card[] memory cards = new Card[](communityCardCount);
+        for (uint256 i = 0; i < communityCardCount; i++) {
+            cards[i] = communityCards[i];
+        }
+        return cards;
+    }
+
+    function dealCommunityCards(uint256 cardsToDeal) internal {
+        require(currentPhase == GamePhase.Flop || currentPhase == GamePhase.Turn || currentPhase == GamePhase.River, "Poker Game : Invalid game phase for dealing community cards");
+
+        for (uint256 i = 0; i < cardsToDeal; i++) {
+            communityCards[communityCardCount] = drawCard();
+            emit CardDealt(address(0), communityCards[communityCardCount]); // address(0) indicates it's a community card
+            communityCardCount++;
         }
     }
 
@@ -296,53 +605,248 @@ contract PokerGame is VRFConsumerBase, Ownable, ReentrancyGuard {
         }
     }
 
-    function dealCardsToPlayers() internal {
-        require(deck.length >= playerAddresses.length * 2, "PokerGame: Not enough cards in the deck");
-        for (uint256 i = 0; i < playerAddresses.length; i++) {
-            Player storage player = players[playerAddresses[i]];
-            player.hand.push(Card({
-                suit: Suit(deck[0] / 13),
-                value: Value(deck[0] % 13)
-            }));
-            deck = removeCardFromDeck(0);
-            player.hand.push(Card({
-                suit: Suit(deck[0] / 13),
-                value: Value(deck[0] % 13)
-            }));
-            deck = removeCardFromDeck(0);
-            emit CardDealt(playerAddresses[i], player.hand[0]);
-            emit CardDealt(playerAddresses[i], player.hand[1]);
+    function isPair(Card[] memory hand) internal pure returns (bool) {
+        return countValueOccurrences(hand, 2) == 1;
+    }
+
+    function isThreeOfAKind(Card[] memory hand) internal pure returns (bool) {
+        return countValueOccurrences(hand, 3) == 1;
+    }
+
+    function isFourOfAKind(Card[] memory hand) internal pure returns (bool) {
+        return countValueOccurrences(hand, 4) == 1;
+    }
+
+    function isFullHouse(Card[] memory hand) internal pure returns (bool) {
+        uint8[13] memory values;
+        for (uint i = 0; i < hand.length; i++) {
+            values[uint8(hand[i].value)]++;
         }
-    }
-
-    function removeCardFromDeck(uint256 index) internal returns (uint256[] memory) {
-        uint256[] memory newDeck = new uint256[](deck.length - 1);
-        for (uint256 i = 0; i < index; i++) {
-            newDeck[i] = deck[i];
+        bool foundThreeOfAKind = false;
+        bool foundPair = false;
+        for (uint i = 0; i < 13; i++) {
+            if (values[i] == 3) {
+                foundThreeOfAKind = true;
+            } else if (values[i] == 2) {
+                foundPair = true;
+            }
         }
-        for (uint256 i = index; i < newDeck.length; i++) {
-            newDeck[i] = deck[i + 1];
+        return foundThreeOfAKind && foundPair;
+    }
+
+    function isTwoPairs(Card[] memory hand) internal pure returns (bool) {
+        return countValueOccurrences(hand, 2) == 2;
+    }
+
+    function isStraight(Card[] memory hand) internal pure returns (bool) {
+        uint8[13] memory valueCounts;
+        for (uint i = 0; i < hand.length; i++) {
+            valueCounts[uint8(hand[i].value)]++;
         }
-        return newDeck;
+        uint8 consecutiveCount = 0;
+        for (uint8 i = 0; i < 13; i++) {
+            if (valueCounts[i] > 0) {
+                consecutiveCount++;
+                if (consecutiveCount == 5) return true;
+            } else {
+                consecutiveCount = 0;
+            }
+        }
+        // Ace-low straight
+        if (valueCounts[12] > 0 && valueCounts[0] > 0 && valueCounts[1] > 0 && valueCounts[2] > 0 && valueCounts[3] > 0) {
+            return true;
+        }
+        return false;
     }
 
-    function getDeck() public view returns (uint256[] memory) {
-        return deck;
+    function isFlush(Card[] memory hand) internal pure returns (bool) {
+        return countSuitOccurrences(hand, 5);
     }
 
-    function getPlayerHand(address player) public view returns (Card[] memory) {
-        return players[player].hand;
+    function isStraightFlush(Card[] memory hand) internal pure returns (bool) {
+        return isFlush(hand) && isStraight(hand);
     }
 
-    function getPlayer(address player) public view returns (Player memory) {
-        return players[player];
+    function isRoyalFlush(Card[] memory hand) internal pure returns (bool) {
+        uint8[13] memory values;
+        uint8[4] memory suits;
+        for (uint i = 0; i < hand.length; i++) {
+            suits[uint8(hand[i].suit)]++;
+            values[uint8(hand[i].value)]++;
+        }
+        return (suits[0] >= 5 && values[9] == 1 && values[10] == 1 && values[11] == 1 && values[12] == 1);
     }
 
-    function endGame() external onlyOwner isGameActive {
-        require(playerAddresses.length == 1, "PokerGame: More than one player remaining");
-        address winner = playerAddresses[0];
-        players[winner].balance += currentPot;
-        emit GameEnded(winner);
-        gameActive = false;
+    function countValueOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (uint8) {
+        uint8[13] memory values;
+        for (uint8 i = 0; i < hand.length; i++) {
+            values[uint8(hand[i].value)]++;
+        }
+        uint8 count = 0;
+        for (uint8 i = 0; i < 13; i++) {
+            if (values[i] == occurrence) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    function countSuitOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (bool) {
+        uint8[4] memory suits;
+        for (uint8 i = 0; i < hand.length; i++) {
+            suits[uint8(hand[i].suit)]++;
+        }
+        for (uint8 i = 0; i < 4; i++) {
+            if (suits[i] >= occurrence) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function getFourOfAKindValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256[13] memory values;
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
+        }
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 4) {
+                return i;
+            }
+        }
+        revert("No Four of a Kind found");
+    }
+
+    function getFullHouseValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256[13] memory values;
+        uint256 threeOfAKindValue;
+        uint256 pairValue;
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
+        }
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 3) {
+                threeOfAKindValue = i;
+            } else if (values[i] == 2) {
+                pairValue = i;
+            }
+        }
+        if (threeOfAKindValue != 0 && pairValue != 0) {
+            return threeOfAKindValue * 100 + pairValue;
+        }
+        revert("No Full House found");
+    }
+
+    function getThreeOfAKindValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256[13] memory values;
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
+        }
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 3) {
+                return i;
+            }
+        }
+        revert("No Three of a Kind found");
+    }
+
+    function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256[13] memory values;
+        uint256 firstPair;
+        uint256 secondPair;
+        uint256 kicker = 0;
+
+        // Count the occurrences of each card value
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
+        }
+
+        // Find the two pairs
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 2) {
+                if (firstPair == 0) {
+                    firstPair = i;
+                } else {
+                    secondPair = i;
+                    break;
+                }
+            }
+        }
+
+        // If we have two pairs
+        if (firstPair != 0 && secondPair != 0) {
+            // Ensure that pairs are ordered from highest to lowest
+            if (firstPair < secondPair) {
+                (firstPair, secondPair) = (secondPair, firstPair);
+            }
+
+            // Find the kicker (the card not part of any pair)
+            for (uint256 i = 0; i < hand.length; i++) {
+                if (uint256(hand[i].value) != firstPair && uint256(hand[i].value) != secondPair) {
+                    kicker = kicker < uint256(hand[i].value) ? uint256(hand[i].value) : kicker;
+                }
+            }
+
+            return firstPair * 10000 + secondPair * 100 + kicker;
+        }
+
+        revert("No Two Pairs found");
+    }
+
+    function getStraightValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256[13] memory values;
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
+        }
+        for (uint256 i = 0; i < 9; i++) {
+            if (values[i] > 0 && values[i+1] > 0 && values[i+2] > 0 && values[i+3] > 0 && values[i+4] > 0) {
+                return i + 4;
+            }
+        }
+        // Special case for Ace-low straight
+        if (values[12] > 0 && values[0] > 0 && values[1] > 0 && values[2] > 0 && values[3] > 0) {
+            return 3; // 5 in Ace-low straight
+        }
+        revert("No Straight found");
+    }
+
+    function getFlushValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256[13] memory values;
+        uint256[4] memory suits;
+        for (uint256 i = 0; i < hand.length; i++) {
+            suits[uint256(hand[i].suit)]++;
+            values[uint256(hand[i].value)]++;
+        }
+        uint256 highCard = 0;
+        for (uint256 i = 0; i < 4; i++) {
+            if (suits[i] >= 5) {
+                for (uint256 j = 0; j < hand.length; j++) {
+                    if (uint256(hand[j].suit) == i) {
+                        highCard = highCard < uint256(hand[j].value) ? uint256(hand[j].value) : highCard;
+                    }
+                }
+                return highCard;
+            }
+        }
+        revert("No Flush found");
+    }
+
+    function getStraightFlushValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256 straightValue = getStraightValue(hand);
+        uint256 flushValue = getFlushValue(hand);
+        return straightValue > flushValue ? straightValue : flushValue;
+    }
+
+    function evaluateHand(Card[] memory hand) internal pure returns (uint256) {
+        if (isRoyalFlush(hand)) return uint256(HandRanking.RoyalFlush);
+        if (isStraightFlush(hand)) return uint256(HandRanking.StraightFlush);
+        if (isFourOfAKind(hand)) return uint256(HandRanking.FourOfAKind) * 100 + getFourOfAKindValue(hand);
+        if (isFullHouse(hand)) return uint256(HandRanking.FullHouse) * 100 + getFullHouseValue(hand);
+        if (isFlush(hand)) return uint256(HandRanking.Flush) * 100 + getFlushValue(hand);
+        if (isStraight(hand)) return uint256(HandRanking.Straight) * 100 + getStraightValue(hand);
+        if (isThreeOfAKind(hand)) return uint256(HandRanking.ThreeOfAKind) * 100 + getThreeOfAKindValue(hand);
+        if (isTwoPairs(hand)) return uint256(HandRanking.TwoPairs) * 10000 + getTwoPairsValue(hand);
+        // Add handling for One Pair and High Card if needed
+        return uint256(HandRanking.HighCard);
     }
 }
