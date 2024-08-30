@@ -4,12 +4,13 @@ pragma solidity ^0.8.19;
 
 import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
 
+
 /// @title A contract for a poker game
 /// @author James Wong
 /// @notice This contract manages a poker game with multiple players
 /// @dev All function calls are currently implemented without side effects
 
-contract HandEvaluator is VRFConsumerBase {
+contract HandEvaluator is VRFConsumerBase  {
     // Chainlink VRF variables
     bytes32 internal keyHash;
     uint256 internal fee;
@@ -104,14 +105,15 @@ SidePot[] public sidePots;
 
     // New events
     event PlayerBetPlaced(address indexed player, uint256 amount);
-    event PlayerCalled(address indexed player);
+    event PlayerCalled(address indexed player, uint amount);
     event PlayerRaised(address indexed player, uint256 amount);
     event PlayerFolded(address indexed player);
     event NewRoundStarted(uint256 roundNumber);
     event RoundEnded(uint256 roundNumber);
     event GameStarted();
-    event GameEnded(address indexed winner);
+    event GameEnded(address[] winner);
     event BetPlaced(address player, uint256 amount);
+    event PayoutProcessed(address player, uint256 amout);
 
     // Constructor
     constructor(
@@ -174,8 +176,9 @@ SidePot[] public sidePots;
     // Start the Game
     function startGame() external onlyOwner {
         require(!gameActive, "PokerGame: Game is already in progress");
-        require(playerAddresses.length > 1, "PokerGame: Not enough players to start the game");
-        
+        require(playerAddresses.length >=2, "PokerGame: Not enough players to start the game");
+        require(LINK.balanceOf(address(this)) >= fee, "PokerGame: Not enough LINK to request randomness");
+
         gameActive = true;
         currentPot = 0;
         currentPlayerIndex = 0;
@@ -205,6 +208,8 @@ SidePot[] public sidePots;
 
     require(msg.sender == playerAddresses[currentPlayerIndex], "PokerGame: It's not your turn to play. Please wait for your turn.");
     require(players[msg.sender].action != PlayerAction.Fold, "PokerGame: You have already folded and cannot take any more actions in this hand.");
+    require(betAmount >= currentRound.betAmount || betAmount == 0, "PokerGame: Invalid bet amount");
+    require(players[msg.sender].balance >= betAmount, "PokerGame: Insufficient balance");
 
         // Handle different actions
         if (betAmount == 0) {
@@ -236,29 +241,45 @@ SidePot[] public sidePots;
         players[msg.sender].action = PlayerAction.Fold;
         removePlayerFromActiveList(msg.sender);
         emit PlayerFolded(msg.sender);
+
+        if (getCurrentActivePlayers() == 1) {
+            address[] memory lastActivePlayer;
+            lastActivePlayer[0] = getLastActivePlayer();
+         endGame(lastActivePlayer);
+       }
+
     }
 
     function call() internal {
         uint256 callAmount = currentRound.betAmount - currentRound.playerBets[msg.sender];
+        require(players[msg.sender].balance >= callAmount, "PokerGame: Insufficient balance to call");
         players[msg.sender].balance -= callAmount;
         currentRound.playerBets[msg.sender] += callAmount;
         currentRound.totalPot += callAmount;
         mainPot += callAmount;
 
-        emit PlayerCalled(msg.sender);
+        emit PlayerCalled(msg.sender, callAmount);
+
+       if (isRoundComplete()) {
+        advancePhase();
+       }
     }
 
     function raise(uint256 amount) internal {
-        require(amount > currentRound.betAmount, "PokerGame: Raise amount too low");
-        uint256 raiseAmount = amount - currentRound.betAmount;
+        require(amount > currentRound.betAmount, "PokerGame: Raise amount must be higher than current bet");
+        uint256 raiseAmount = amount - currentRound.playerBets[msg.sender];
         require(players[msg.sender].balance >= raiseAmount, "PokerGame: Insufficient balance to raise");
 
-        players[msg.sender].balance -= raiseAmount;
-        currentRound.playerBets[msg.sender] += raiseAmount;
-        currentRound.totalPot += raiseAmount;
-        currentRound.betAmount = amount;
+       players[msg.sender].balance -= raiseAmount;
+       currentRound.playerBets[msg.sender] += raiseAmount;
+       currentRound.totalPot += raiseAmount;
+      currentRound.betAmount = amount;
+      mainPot += raiseAmount;
 
-        emit PlayerRaised(msg.sender, raiseAmount);
+      emit PlayerRaised(msg.sender, raiseAmount);
+
+      resetPlayersActed();
+
     }
 
     function handleAllIn(address player, uint256 allInAmount) internal {
@@ -280,6 +301,43 @@ SidePot[] public sidePots;
         mainPot += allInAmount;
         players[player].action = PlayerAction.AllIn;
     }
+
+    function getCurrentActivePlayers() internal view returns (uint256) {
+    uint256 activePlayers = 0;
+    for (uint256 i = 0; i < playerAddresses.length; i++) {
+    if (players[playerAddresses[i]].action != PlayerAction.Fold) {
+    activePlayers++;
+    }
+    }
+    return activePlayers;
+    }
+
+   function getLastActivePlayer() internal view returns (address) {
+   for (uint256 i = 0; i < playerAddresses.length; i++) {
+   if (players[playerAddresses[i]].action != PlayerAction.Fold) {
+   return playerAddresses[i];
+   }
+   }
+   revert("PokerGame: No active players found");
+   }
+
+function isRoundComplete() internal view returns (bool) {
+for (uint256 i = 0; i < playerAddresses.length; i++) {
+if (players[playerAddresses[i]].action != PlayerAction.Fold &&
+currentRound.playerBets[playerAddresses[i]] < currentRound.betAmount) {
+return false;
+}
+}
+return true;
+}
+
+function resetPlayersActed() internal {
+for (uint256 i = 0; i < playerAddresses.length; i++) {
+if (players[playerAddresses[i]].action != PlayerAction.Fold) {
+players[playerAddresses[i]].action = PlayerAction.Begin;
+}
+}
+}
 
     function isOnePair(Card[] memory hand) internal pure returns (bool) {
     for (uint8 i = 0; i < hand.length - 1; i++) {
@@ -624,24 +682,47 @@ function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
 }
 
      function distributePots() internal {
+        require(currentPhase == GamePhase.Showdown, "PokerGame: Cannot distribute pots before showdown");
+
+        // Distribute main pot
         address[] memory mainWinners = determineWinners();
         uint256 mainPotShare = mainPot / mainWinners.length;
-
-        // Distribute the main pot among all main winners
-        for (uint i = 0; i < mainWinners.length; i++) {
-            payable(mainWinners[i]).transfer(mainPotShare);
-        }
-
-        // Distribute each side pot among the respective side pot winners
-        for (uint i = 0; i < sidePots.length; i++) {
-            address[] memory sideWinners = determineWinnersForSidePot(sidePots[i].eligiblePlayers);
-            uint256 sidePotShare = sidePots[i].amount / sideWinners.length;
-
-            for (uint j = 0; j < sideWinners.length; j++) {
-                payable(sideWinners[j]).transfer(sidePotShare);
-            }
-        }
+        for (uint256 i = 0; i < mainWinners.length; i++) {
+        players[mainWinners[i]].balance += mainPotShare;
+        emit PayoutProcessed(mainWinners[i], mainPotShare);
+}
+// Distribute side pots
+for (uint256 i = 0; i < sidePots.length; i++) {
+    address[] memory sideWinners = determineWinnersForSidePot(sidePots[i].eligiblePlayers);
+    uint256 sidePotShare = sidePots[i].amount / sideWinners.length;
+    for (uint256 j = 0; j < sideWinners.length; j++) {
+        players[sideWinners[j]].balance += sidePotShare;
+        emit PayoutProcessed(sideWinners[j], sidePotShare);
     }
+}
+
+// Reset game state
+resetGameState(mainWinners);
+  }
+
+  // Helper function to reset game state after pot distribution
+function resetGameState(address[] memory winnersArray) internal {
+gameActive = false;
+mainPot = 0;
+delete sidePots;
+currentPhase = GamePhase.PreFlop;
+communityCardCount = 0;
+delete communityCards;
+
+for (uint256 i = 0; i < playerAddresses.length; i++) {
+    delete players[playerAddresses[i]].hand;
+    players[playerAddresses[i]].action = PlayerAction.Begin;
+    players[playerAddresses[i]].isAllIn = false;
+}
+
+emit GameEnded(winnersArray);
+}
+
 
  function removePlayerFromActiveList(address player) internal {
         // Implementation to remove player from activePlayers array
@@ -727,7 +808,7 @@ function getCommunityCards() external view returns (Card[] memory) {
 }
 
 
-function advancePhase() external onlyOwner {
+function advancePhase() public onlyOwner {
     require(currentPhase != GamePhase.Showdown, "Game is already in showdown phase");
     
     if (currentPhase == GamePhase.PreFlop) {
@@ -784,7 +865,7 @@ function resetBettingRound() internal {
         currentPlayerIndex = (currentPlayerIndex + 1) % playerAddresses.length;
     }
 
-    function endGame(address winner) external onlyOwner {
+    function endGame(address[] memory winner) public onlyOwner {
         require(gameActive, "PokerGame: Game is not in progress");
         gameActive = false;
         delete communityCards;
