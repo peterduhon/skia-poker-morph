@@ -9,7 +9,7 @@ import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
 /// @notice This contract manages a poker game with multiple players
 /// @dev All function calls are currently implemented without side effects
 
-contract PokerGame is VRFConsumerBase {
+contract HandEvaluator is VRFConsumerBase {
     // Chainlink VRF variables
     bytes32 internal keyHash;
     uint256 internal fee;
@@ -23,11 +23,12 @@ contract PokerGame is VRFConsumerBase {
     uint256 public currentPlayerIndex;
     uint256[] public deck;
     uint256 public currentBet;
+    enum PlayerAction { Begin, Fold, Raise, Call, Check, AllIn }
     GamePhase public currentPhase;
     Card[5] public communityCards;
     uint256 public communityCardCount;
     mapping(bytes32 => bool) public pendingRequests;
-    uint256[52] private constant INITIAL_DECK = [
+    uint256[52] private INITIAL_DECK = [
     0,1,2,3,4,5,6,7,8,9,10,11,12,
     13,14,15,16,17,18,19,20,21,22,23,24,25,
     26,27,28,29,30,31,32,33,34,35,36,37,38,
@@ -39,7 +40,7 @@ contract PokerGame is VRFConsumerBase {
         address addr;
         uint256 balance;
         bool registered;
-        bool folded;
+        PlayerAction action;
         bool isAllIn;
         Card[] hand;  // Each player has a hand of two cards
     }
@@ -160,14 +161,11 @@ SidePot[] public sidePots;
     function registerPlayer() external isEOA {
         require(!players[msg.sender].registered, "PokerGame: Player already registered");
 
-        players[msg.sender] = Player({
-            addr: msg.sender,
-            balance: 0,
-            registered: true,
-            folded: false,
-            isAllIn: false,
-            hand: new Card 
-        });
+        players[msg.sender].addr = msg.sender;
+        players[msg.sender].balance = 0;
+        players[msg.sender].registered = true;
+        players[msg.sender].action = PlayerAction.Begin;
+        players[msg.sender].isAllIn = false;
 
         playerAddresses.push(msg.sender);
         emit PlayerRegistered(msg.sender);
@@ -206,7 +204,7 @@ SidePot[] public sidePots;
     function manageTurn(uint256 betAmount) external isGameActive isPlayer {
 
     require(msg.sender == playerAddresses[currentPlayerIndex], "PokerGame: It's not your turn to play. Please wait for your turn.");
-    require(!players[msg.sender].folded, "PokerGame: You have already folded and cannot take any more actions in this hand.");
+    require(players[msg.sender].action != PlayerAction.Fold, "PokerGame: You have already folded and cannot take any more actions in this hand.");
 
         // Handle different actions
         if (betAmount == 0) {
@@ -235,7 +233,7 @@ SidePot[] public sidePots;
     }
 
     function fold() internal {
-        players[msg.sender].folded = true;
+        players[msg.sender].action = PlayerAction.Fold;
         removePlayerFromActiveList(msg.sender);
         emit PlayerFolded(msg.sender);
     }
@@ -251,30 +249,36 @@ SidePot[] public sidePots;
     }
 
     function raise(uint256 amount) internal {
-        require(amount > currentRound.betAmount, "PokerGame: Raise amount must be greater than the current bet. Your raise: {amount}, Current bet: {currentRound.betAmount}");
+        require(amount > currentRound.betAmount, "PokerGame: Raise amount too low");
         uint256 raiseAmount = amount - currentRound.betAmount;
-        players[msg.sender].balance -= amount;
-        currentRound.playerBets[msg.sender] += amount;
-        currentRound.totalPot += amount;
-        currentRound.betAmount = amount;
-        mainPot += amount;
+        require(players[msg.sender].balance >= raiseAmount, "PokerGame: Insufficient balance to raise");
 
-        emit PlayerRaised(msg.sender, amount);
+        players[msg.sender].balance -= raiseAmount;
+        currentRound.playerBets[msg.sender] += raiseAmount;
+        currentRound.totalPot += raiseAmount;
+        currentRound.betAmount = amount;
+
+        emit PlayerRaised(msg.sender, raiseAmount);
     }
 
     function handleAllIn(address player, uint256 allInAmount) internal {
-    if (allInAmount < currentBet) {
-        SidePot memory newSidePot;
-        newSidePot.amount = (currentBet - allInAmount) * (activePlayers.length - 1);
-        for (uint8 i = 0; i < activePlayers.length; i++) {
-            if (activePlayers[i] != player) {
-                newSidePot.eligiblePlayers.push(activePlayers[i]);
+        // If player's all-in amount is less than the current bet, create a side pot
+        address[] memory activePlayers = currentRound.activePlayers;
+
+        if (allInAmount < currentBet) {
+            SidePot memory newSidePot;
+            uint index = 0;
+            newSidePot.amount = (currentBet - allInAmount) * (activePlayers.length - 1);
+            for (uint i = 0; i < activePlayers.length; i++) {
+                if (activePlayers[i] != player) {
+                    newSidePot.eligiblePlayers[index++] = activePlayers[i];
+                }
             }
+            sidePots.push(newSidePot);
         }
-        sidePots.push(newSidePot);
-    }
-    mainPot -= allInAmount;
-    player.isAllIn = true;
+        // Update main pot and player status
+        mainPot += allInAmount;
+        players[player].action = PlayerAction.AllIn;
     }
 
     function isOnePair(Card[] memory hand) internal pure returns (bool) {
@@ -323,40 +327,21 @@ function isFlush(Card[] memory hand) internal pure returns (bool) {
 }
 
 function isRoyalFlush(Card[] memory hand)internal pure returns (bool){
-    Suit suit = hand[0].suit;
-    Value[] memory values = new Value[](4);
-    for (uint8 i = 1; i < 5; i++) {
-        values[i] = hand[i].value;
-        if (hand[i].suit != suit) {
-            return false;
+    uint8[13] memory values;
+        uint8[4] memory suits;
+        for (uint i = 0; i < hand.length; i++) {
+            suits[uint8(hand[i].suit)]++;
+            values[uint8(hand[i].value)]++;
         }
-    }
-     values = values.sort();
-    
-    for (uint8 i = 0; i < 5; i++) {
-        if (values[0]!=Value.Ace) {
-            return false;
-        }
-        if (values[1]!=Value.Jack) {
-            return false;
-        }
-        if (values[0]!=Value.Queen) {
-            return false;
-        }
-        if (values[0]!=Value.Ten) {
-            return false;
-        }
-    }
-
-    return true;
+        return (suits[0] >= 5 && values[9] == 1 && values[10] == 1 && values[11] == 1 && values[12] == 1);
 }
 
 function isStraightFlush(Card[] memory hand)internal pure returns (bool){
     Suit suit = hand[0].suit;
-    uint8[] values = new uint8[](13);
+    uint8[] memory values = new uint8[](13);
     
     for (uint i = 1; i < 5; i++) {
-        values[i] = hand[i].value;
+        values[i] = uint8(hand[i].value);
         if (hand[i].suit != suit) {
             return false;
         }
@@ -393,33 +378,23 @@ uint8[4] memory valueCounts;
 }
 
 function isFullHouse(Card[] memory hand)internal pure returns (bool){
-     uint8[4] memory suitCounts;
-     bool hasThreeOfAKind = false;
-    for (uint8 i = 0; i < hand.length; i++) {
-        suitCounts[uint8(hand[i].suit)]++;
-        if (suitCounts[uint8(hand[i].suit)]==3){
-            hasThreeOfAKind=true;
+     uint8[13] memory values;
+        for (uint i = 0; i < hand.length; i++) {
+            values[uint8(hand[i].value)]++;
         }
-    }
-
-    
-      bool hasPair = false;
-    for (Value value; value <= Value.Ace; value++) {
-        uint8 count = valueCounts[value];
-        if (count == 3) {
-            hasThreeOfAKind = true;
-        } else if (count == 2) {
-            hasPair = true;
+        bool foundThreeOfAKind = false;
+        bool foundPair = false;
+        for (uint i = 0; i < 13; i++) {
+            if (values[i] == 3) {
+                foundThreeOfAKind = true;
+            } else if (values[i] == 2) {
+                foundPair = true;
+            }
         }
-        if (hasThreeOfAKind && hasPair) {
-            return true;
-        }
-    }
-
-    return false;
+        return foundThreeOfAKind && foundPair;
 }
 
-function isThreeOfKind(Card[] memory hand) public pure returns (bool) {
+function isThreeOfAKind(Card[] memory hand) public pure returns (bool) {
     
     uint8[4] memory valueCounts;
     for (uint8 i = 0; i < hand.length; i++) {
@@ -433,34 +408,22 @@ function isThreeOfKind(Card[] memory hand) public pure returns (bool) {
 }
 
 function isTwoPairs(Card[] memory hand) public pure returns (bool) {
-bool pair1Found = false;
-    bool pair2Found = false;
-    Value pair1Value;
-    Value pair2Value;
-      uint8[4] memory suitCounts;
-    for (uint8 i = 0; i < hand.length; i++) {
-        suitCounts[uint8(hand[i].suit)]++;
-        if (suitCounts[uint8(hand[i].suit)]==2){
-            pair1Found = true;
+ uint8[13] memory values;
+        for (uint8 i = 0; i < hand.length; i++) {
+            values[uint8(hand[i].value)]++;
         }
-    }
-   
-    
-    
-    for (Value value = Value.Two; value <= Value.Ace; value++) {
-        if (valueCounts[value] >= 2) {
-            if (!pair1Found) {
-                pair1Found = true;
-                pair1Value = value;
-            } else if (!pair2Found && value != pair1Value) {
-                pair2Found = true;
-                pair2Value = value;
+        uint8 count = 0;
+        for (uint8 i = 0; i < values.length; i++) {
+            if (values[i] == 2) {
+                count++;
+            }
+            if (count==2){
+                return true;
             }
         }
-    }
-   
-    return pair1Found && pair2Found;
+        return false;
 }
+
 function getHighCard(Card[] memory hand) internal pure returns (uint256) {
     uint256 highCardValue = 0;
     for (uint256 i = 0; i < hand.length; i++) {
@@ -517,7 +480,7 @@ function getFourOfAKindValue(Card[] memory hand) internal pure returns (uint256)
         }
     }
        
-            kickerValue = valueCount[valueCounts.length -1];
+            kickerValue = valueCounts[valueCounts.length -1];
             
        return fourOfAKindValue * 1000000 + kickerValue;
 }
@@ -530,11 +493,11 @@ function getFullHouseValue(Card[] memory hand) internal pure returns (uint256) {
 
     for (uint256 i = 0; i < hand.length; i++) {
         Value currentValue = hand[i].value;
-        valueCounts[currentValue]++;
+        valueCounts[i]++;
 
-        if (valueCounts[currentValue] == 3) {
+        if (valueCounts[i] == 3) {
             threeOfAKindValue = uint256(currentValue);
-        } else if (valueCounts[currentValue] == 2) {
+        } else if (valueCounts[i] == 2) {
             pairValue = uint256(currentValue);
         }
     }
@@ -581,14 +544,14 @@ function getStraightValue(Card[] memory hand) internal pure returns (uint256) {
 
        for (uint8 i = 12; i >= 4; i--) {
         if (valueCounts[i] > 0) {
-            bool isStraight = true;
+            bool straight = true;
             for (uint8 j = 0; j < 5; j++) {
                 if (valueCounts[i - j] == 0) {
-                    isStraight = false;
+                    straight = false;
                     break;
                 }
             }
-            if (isStraight) {
+            if (straight) {
                 straightValue = i;
                 break;
             }
@@ -605,73 +568,80 @@ function getStraightValue(Card[] memory hand) internal pure returns (uint256) {
 }
 
 function getThreeOfAKindValue(Card[] memory hand) internal pure returns (uint256) {
-    uint8[4] memory valueCounts;
-    Value threeOfAKindValue;
-    uint256 kicker1;
-    uint256 kicker2;
+    uint256[13] memory values;
         for (uint256 i = 0; i < hand.length; i++) {
-        valueCounts[hand[i].value]++;
-    }
-      for (Value value = Value.Ace; value >= Value.Two; value--) {
-        if (valueCounts[value] >= 3) {
-            threeOfAKindValue = value;
-            break;
+            values[uint256(hand[i].value)]++;
         }
-    }
-        for (Value value = Value.Ace; value >= Value.Two; value--) {
-        if (value != threeOfAKindValue && valueCounts[value] > 0) {
-            if (kicker1 == 0) {
-                kicker1 = uint256(value);
-            } else {
-                kicker2 = uint256(value);
-                break;
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 3) {
+                return i;
             }
         }
-    }
-       uint256 threeOfAKindValueInt = uint256(threeOfAKindValue);
-    return threeOfAKindValueInt * 1000000 + kicker1 * 13000 + kicker2 * 100;
+        revert("No Three of a Kind found");
 }
 
 function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
-    uint8[4] memory valueCounts;
-    Value pair1Value;
-    Value pair2Value;
-    uint256 kicker;
+     uint256[13] memory values;
+        uint256 firstPair;
+        uint256 secondPair;
+        uint256 kicker = 0;
 
-     for (uint8 i = 0; i < hand.length; i++) {
-        valueCounts[hand[i].value]++;
-    }
+        // Count the occurrences of each card value
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
+        }
 
-      for (Value value = Value.Ace; value >= Value.Two; value--) {
-        if (valueCounts[value] >= 2) {
-            if (pair1Value == 0) {
-                pair1Value = value;
-            } else {
-                pair2Value = value;
-                break;
+        // Find the two pairs
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 2) {
+                if (firstPair == 0) {
+                    firstPair = i;
+                } else {
+                    secondPair = i;
+                    break;
+                }
+            }
+        }
+
+        // If we have two pairs
+        if (firstPair != 0 && secondPair != 0) {
+            // Ensure that pairs are ordered from highest to lowest
+            if (firstPair < secondPair) {
+                (firstPair, secondPair) = (secondPair, firstPair);
+            }
+
+            // Find the kicker (the card not part of any pair)
+            for (uint256 i = 0; i < hand.length; i++) {
+                if (uint256(hand[i].value) != firstPair && uint256(hand[i].value) != secondPair) {
+                    kicker = kicker < uint256(hand[i].value) ? uint256(hand[i].value) : kicker;
+                }
+            }
+
+            return firstPair * 10000 + secondPair * 100 + kicker;
+        }
+
+        revert("No Two Pairs found");
+}
+
+     function distributePots() internal {
+        address[] memory mainWinners = determineWinners();
+        uint256 mainPotShare = mainPot / mainWinners.length;
+
+        // Distribute the main pot among all main winners
+        for (uint i = 0; i < mainWinners.length; i++) {
+            payable(mainWinners[i]).transfer(mainPotShare);
+        }
+
+        // Distribute each side pot among the respective side pot winners
+        for (uint i = 0; i < sidePots.length; i++) {
+            address[] memory sideWinners = determineWinnersForSidePot(sidePots[i].eligiblePlayers);
+            uint256 sidePotShare = sidePots[i].amount / sideWinners.length;
+
+            for (uint j = 0; j < sideWinners.length; j++) {
+                payable(sideWinners[j]).transfer(sidePotShare);
             }
         }
     }
-      for (Value value = Value.Ace; value >= Value.Two; value--) {
-        if (value != pair1Value && value != pair2Value && valueCounts[value] > 0) {
-            kicker = uint256(value);
-            break;
-        }
-    }
-     uint256 pair1ValueInt = uint256(pair1Value);
-    uint256 pair2ValueInt = uint256(pair2Value);
-    return pair1ValueInt * 1000000 + pair2ValueInt * 13000 + kicker * 100;
-}
-
-    function distributePots() internal {
-    address mainWinner = determineWinner(activePlayers);
-    payable(mainWinner).transfer(mainPot);
-    
-    for (uint i = 0; i < sidePots.length; i++) {
-        address sideWinner = determineWinner(sidePots[i].eligiblePlayers);
-        payable(sideWinner).transfer(sidePots[i].amount);
-    }
-}
 
  function removePlayerFromActiveList(address player) internal {
         // Implementation to remove player from activePlayers array
@@ -687,11 +657,11 @@ function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
     function startNewRound() external onlyOwner {
         require(!gameActive, "PokerGame: Game is already in progress");
         roundNumber++;
-        currentRound = BettingRound({
-            betAmount: buyInAmount,
-            totalPot: 0,
-            activePlayers: playerAddresses
-        });
+
+        currentRound.betAmount = buyInAmount;
+        currentRound.totalPot = 0;
+        currentRound.activePlayers = playerAddresses;
+        for (uint256 i = 0; i < currentRound.activePlayers.length; i++) currentRound.playerBets[playerAddresses[i]] = 0;
         emit NewRoundStarted(roundNumber);
     }
 
@@ -841,29 +811,101 @@ function resetBettingRound() internal {
 
     }
 
-    function determineWinner() internal view returns (address) {
-    address winner;
-    uint256 bestHandValue = 0;
+    function determineWinners() internal view returns (address[] memory) {
+        uint256 bestHandValue = 0;
+        uint256 winnerCount = 0;
+        
+        // First pass: Find the best hand value
+        for (uint i = 0; i < playerAddresses.length; i++) {
+            address player = playerAddresses[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
 
-    for (uint256 i = 0; i < playerAddresses.length; i++) {
-        address player = playerAddresses[i];
-        if (!players[player].folded) {
-            Card[] memory fullHand = new Card[](7);
-            fullHand[0] = players[player].hand[0];
-            fullHand[1] = players[player].hand[1];
-            for (uint256 j = 0; j < 5; j++) {
-                fullHand[j + 2] = communityCards[j];
-            }
-
-            uint256 handValue = evaluateHand(fullHand);
-            if (handValue > bestHandValue) {
-                bestHandValue = handValue;
-                winner = player;
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue > bestHandValue) {
+                    bestHandValue = handValue;
+                    winnerCount = 1;
+                } else if (handValue == bestHandValue) {
+                    winnerCount++;
+                }
             }
         }
+        address[] memory winners = new address[](winnerCount);
+        uint256 index = 0;
+        for (uint i = 0; i < playerAddresses.length; i++) {
+            address player = playerAddresses[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint256 j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue == bestHandValue) {
+                    winners[index] = player;
+                    index++;
+                }
+            }
+        }
+
+        return winners;
     }
 
-    return winner;
-}
+
+function determineWinnersForSidePot(address[] memory eligiblePlayers) internal view returns (address[] memory) {
+        uint256 bestHandValue = 0;
+        uint256 winnerCount = 0;
+        
+        // First pass: Find the best hand value
+        for (uint i = 0; i < eligiblePlayers.length; i++) {
+            address player = eligiblePlayers[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint256 j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue > bestHandValue) {
+                    bestHandValue = handValue;
+                    winnerCount = 1;
+                } else if (handValue == bestHandValue) {
+                    winnerCount++;
+                }
+            }
+        }
+        
+        // Second pass: Collect all players with the best hand
+        address[] memory winners = new address[](winnerCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < eligiblePlayers.length; i++) {
+            address player = eligiblePlayers[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint256 j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue == bestHandValue) {
+                    winners[index] = player;
+                    index++;
+                }
+            }
+        }
+
+        return winners;
+    }
 
 }
