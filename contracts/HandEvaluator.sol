@@ -27,6 +27,12 @@ contract PokerGame is VRFConsumerBase {
     Card[5] public communityCards;
     uint256 public communityCardCount;
     mapping(bytes32 => bool) public pendingRequests;
+    uint256[52] private constant INITIAL_DECK = [
+    0,1,2,3,4,5,6,7,8,9,10,11,12,
+    13,14,15,16,17,18,19,20,21,22,23,24,25,
+    26,27,28,29,30,31,32,33,34,35,36,37,38,
+    39,40,41,42,43,44,45,46,47,48,49,50,51
+];
 
     // Player data
     struct Player {
@@ -260,7 +266,7 @@ SidePot[] public sidePots;
     if (allInAmount < currentBet) {
         SidePot memory newSidePot;
         newSidePot.amount = (currentBet - allInAmount) * (activePlayers.length - 1);
-        for (uint i = 0; i < activePlayers.length; i++) {
+        for (uint8 i = 0; i < activePlayers.length; i++) {
             if (activePlayers[i] != player) {
                 newSidePot.eligiblePlayers.push(activePlayers[i]);
             }
@@ -272,8 +278,8 @@ SidePot[] public sidePots;
     }
 
     function isOnePair(Card[] memory hand) internal pure returns (bool) {
-    for (uint i = 0; i < hand.length - 1; i++) {
-        for (uint j = i + 1; j < hand.length; j++) {
+    for (uint8 i = 0; i < hand.length - 1; i++) {
+        for (uint8 j = i + 1; j < hand.length; j++) {
             if (hand[i].value == hand[j].value) {
                 return true;
             }
@@ -374,10 +380,10 @@ function isStraightFlush(Card[] memory hand)internal pure returns (bool){
 }
 
 function isFourOfAKind(Card[] memory hand)internal pure returns (bool){
-uint8[4] memory suitCounts;
+uint8[4] memory valueCounts;
     for (uint8 i = 0; i < hand.length; i++) {
-        suitCounts[uint8(hand[i].suit)]++;
-        if (suitCounts[uint8(hand[i].suit)]==4){
+        valueCounts[uint8(hand[i].value)]++;
+        if (valueCounts[uint8(hand[i].value)]==4){
             return true;
         }
     }
@@ -399,7 +405,7 @@ function isFullHouse(Card[] memory hand)internal pure returns (bool){
     
       bool hasPair = false;
     for (Value value; value <= Value.Ace; value++) {
-        uint256 count = valueCounts[value];
+        uint8 count = valueCounts[value];
         if (count == 3) {
             hasThreeOfAKind = true;
         } else if (count == 2) {
@@ -491,7 +497,7 @@ function getPairValue(Card[] memory hand) internal pure returns (uint256) {
         }
         if (pairValue > 0) break;
     }
-    for (uint i = 0; i < hand.length; i++) {
+    for (uint8 i = 0; i < hand.length; i++) {
         if (uint256(hand[i].value) != pairValue) {
             highCards = highCards * 13 + uint256(hand[i].value);
         }
@@ -503,32 +509,24 @@ function getFourOfAKindValue(Card[] memory hand) internal pure returns (uint256)
     uint256 fourOfAKindValue = 0;
     uint256 kickerValue = 0;
 
-    mapping (Value => uint256) valueCounts;
-
-    for (uint256 i = 0; i < hand.length; i++) {
-        Value currentValue = hand[i].value;
-        valueCounts[currentValue]++;
-
-        if (valueCounts[currentValue] == 4) {
-            fourOfAKindValue = uint256(currentValue);
+    uint8[4] memory valueCounts;
+    for (uint8 i = 0; i < hand.length; i++) {
+        valueCounts[uint8(hand[i].value)]++;
+        if (valueCounts[uint8(hand[i].value)]==4){
+            fourOfAKindValue=uint8(hand[i].value);
         }
     }
-
-    for (uint256 i = 0; i < hand.length; i++) {
-        if (uint256(hand[i].value) != fourOfAKindValue) {
-            kickerValue = uint256(hand[i].value);
-            break;
-        }
-    }
-
-    return fourOfAKindValue * 1000000 + kickerValue;
+       
+            kickerValue = valueCount[valueCounts.length -1];
+            
+       return fourOfAKindValue * 1000000 + kickerValue;
 }
 
 function getFullHouseValue(Card[] memory hand) internal pure returns (uint256) {
     uint256 threeOfAKindValue = 0;
     uint256 pairValue = 0;
 
-    mapping (Value => uint256) valueCounts;
+    uint8[4] memory valueCounts;
 
     for (uint256 i = 0; i < hand.length; i++) {
         Value currentValue = hand[i].value;
@@ -607,7 +605,7 @@ function getStraightValue(Card[] memory hand) internal pure returns (uint256) {
 }
 
 function getThreeOfAKindValue(Card[] memory hand) internal pure returns (uint256) {
-    mapping(Value => uint256) valueCounts;
+    uint8[4] memory valueCounts;
     Value threeOfAKindValue;
     uint256 kicker1;
     uint256 kicker2;
@@ -635,12 +633,12 @@ function getThreeOfAKindValue(Card[] memory hand) internal pure returns (uint256
 }
 
 function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
-    mapping(Value => uint256) valueCounts;
+    uint8[4] memory valueCounts;
     Value pair1Value;
     Value pair2Value;
     uint256 kicker;
 
-     for (uint256 i = 0; i < hand.length; i++) {
+     for (uint8 i = 0; i < hand.length; i++) {
         valueCounts[hand[i].value]++;
     }
 
@@ -795,19 +793,21 @@ function resetBettingRound() internal {
     }
 
     function shuffleDeck(uint256 randomness) internal {
-       uint256[52] memory tempDeck = deck;
-    for (uint256 i = 0; i < 52; i++) {
-        uint256 j = (randomness % (52 - i)) + i;
-        (tempDeck[i], tempDeck[j]) = (tempDeck[j], tempDeck[i]);
+    for (uint256 i = 51; i > 0; i--) {
+        uint256 j = randomness % (i + 1);
+        assembly {
+            let ptr := deck.slot
+            let iValue := sload(add(ptr, i))
+            let jValue := sload(add(ptr, j))
+            sstore(add(ptr, i), jValue)
+            sstore(add(ptr, j), iValue)
+        }
+        randomness = uint256(keccak256(abi.encode(randomness)));
     }
-    deck = tempDeck;
-       
-    }
+}
 
     function initializeDeck() internal {
-        for (uint256 i = 0; i < 52; i++) {
-            deck.push(i);
-        }
+        deck = INITIAL_DECK;
     }
 
     function nextPlayerTurn() internal {
