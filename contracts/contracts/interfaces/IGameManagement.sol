@@ -1,11 +1,27 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 interface IGameManagement {
-    enum RoomStatus { Created, Active, Finished }
+    // Events
+    event GameRoomCreated(uint256 indexed gameId, address indexed creator, uint256 buyInAmount, uint256 maxPlayers);
+    event GameRoomStatusUpdated(uint256 indexed gameId, GameStatus newStatus);
 
-    function createRoom(uint256 buyIn) external returns (uint256 roomId);
-    function getRoomStatus(uint256 roomId) external view returns (RoomStatus);
-    function getRoomBuyIn(uint256 roomId) external view returns (uint256);
-    function setRoomStatus(uint256 roomId, RoomStatus status) external;
+    // Game Status Enum
+    enum GameStatus { Waiting, Active, Completed }
+
+    // Game Management
+    function createGameRoom(uint256 buyInAmount, uint256 maxPlayers) external;
+    function updateGameStatus(uint256 gameId, GameStatus status) external;
+    function getGameRoom(uint256 gameId) external view returns (GameRoom memory);
+    function getUserGames(address user) external view returns (uint256[] memory);
+
+    // Structs
+    struct GameRoom {
+        uint256 id;
+        address creator;
+        uint256 buyInAmount;
+        uint256 maxPlayers;
+        uint256 createdAt;
+        GameStatus status;
+    }
 }

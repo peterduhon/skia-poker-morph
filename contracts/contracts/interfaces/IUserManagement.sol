@@ -1,10 +1,14 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 interface IUserManagement {
-    function registerUser(address user) external;
-    function getUserBalance(address user) external view returns (uint256);
-    function setUserBalance(address user, uint256 amount) external;
-    function getUserProfile(address user) external view returns (string memory name, string memory email);
-    function updateUserProfile(address user, string memory name, string memory email) external;
+    // Events
+    event UserRegistered(address indexed user, string username);
+    event BalanceUpdated(address indexed user, uint256 newBalance);
+
+    // User Management
+    function registerUser(string calldata username) external payable;
+    function updateBalance(address user, uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function getUserProfile(address user) external view returns (string memory username, uint256 balance);
 }
