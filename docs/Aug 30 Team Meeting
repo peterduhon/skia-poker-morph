@@ -1,0 +1,47 @@
+# Skia Poker Team Meeting Notes - August 30
+
+## Attendees
+- Pete
+- Tetiana
+- James (CoolMan)
+
+## Updates and Progress
+
+### Tetiana
+- Working on understanding and implementing Solidity code
+- Switching focus to code comments as per Pete's recent instructions
+- Experiencing some difficulties with setting up environment
+
+### James
+- Separated the PokerGame contract into multiple contracts:
+  - Game mechanics
+  - Betting and pot management
+  - Card management
+  - User management
+- Considering merging game management and game mechanics contracts
+
+### Pete
+- Started a separate chat for frontend, Web3 auth, and UI/UX discussions
+- Planning to use Python code for AI opponent implementation
+- Considering deploying the project to two blockchains: Galadriel (AI blockchain) and Morph blockchain
+
+## Action Items
+
+1. Tetiana to continue updating code and adding comments
+2. Pete to work with Tetiana on splitting her contract
+3. James to keep working on contract separation and optimization
+4. Pete to provide feedback on merging game management and game mechanics contracts
+5. Pete to create a ticket for Python code implementation and share with James
+6. Team to vote on Sunday meeting availability
+7. Pete to schedule a potential Monday meeting
+8. Pete to assist Tetiana with setting up test environment
+
+## Next Steps
+- Continue code updates and improvements
+- Implement AI opponent using Python code
+- Progress on UI/UX and frontend development
+- Explore deployment options on multiple blockchains
+
+## Upcoming Meetings
+- Potential meeting on Sunday (team to vote on availability)
+- Possible meeting on Monday (to be scheduled)
