@@ -1,0 +1,154 @@
+# Skia Poker MVP Features & Basic UI Integration - Trustless Tricksters
+
+**Date:** August 31, 2024
+
+**Prepared by:** Trustless Tricksters Team
+
+## 1. Introduction
+
+### Objective
+This document outlines the core MVP features and basic UI integration tasks for the Skia Poker project, tailored for the Trustless Tricksters team participating in the current hackathon. Our focus is on delivering a functional, visually cohesive poker game on the blockchain within the hackathon timeline, with deployment to the Morph testnet and Galadriel devnet.
+
+### Scope
+- Core MVP Features
+- Basic UI Integration
+- Integration with Blockchain and Web3 Tools
+- Post-Hackathon Considerations
+
+## 2. Core MVP Features
+
+### 2.1. Blockchain Integration
+- **Network Deployment**: 
+  - Deploy smart contracts to Morph testnet (Pete & James)
+  - Deploy AI agent (Glitch Prophet) to Galadriel devnet (Fakename)
+  
+- **Smart Contract Essentials**:
+  - Game Logic: Implement in `GameLogic.sol` and `PlayerManagement.sol` (James)
+  - Chainlink VRF: Integrate in `CardManagement.sol` (Tetiana)
+  - Web3Auth Integration: Implement in frontend (Fakename)
+
+### 2.2. Core Game Mechanics
+- **Gameplay Loop**:
+  - Card Dealing: Implement in `CardManagement.sol` using Chainlink VRF (Tetiana)
+  - Betting Rounds: Implement in `BettingAndPotManagement.sol` (James)
+  - Hand Evaluation: Implement in `HandEvaluator.sol` (Tetiana)
+  - Payout Distribution: Implement in `BettingAndPotManagement.sol` (James)
+
+- **AI Integration (Glitch Prophet)**:
+  - Basic AI Logic: Implement in Javascript, to be integrated with Galadriel (Fakename)
+  - AI Interactions: Ensure AI agent can interact with game contracts (James & Fakename)
+
+### 2.3. UI/UX Elements
+- **Core Interface**:
+  - Game Table: Design and implement (Buddyharshal)
+  - Player Avatars: Design basic avatars with glitch effects (Buddyharshal)
+  - Card Designs: Finalize and integrate card designs (Buddyharshal)
+
+- **Pregame Messaging**:
+  - XMTP Integration: Implement basic messaging functionality (Fakename)
+  - Messaging UI: Design and implement in the game lobby (Buddyharshal & Fakename)
+
+- **Basic Navigation**:
+  - Main Menu & Lobby: Design and implement (Buddyharshal)
+
+## 3. Basic UI Integration
+
+### 3.1. UI Component Integration
+- Button Integration: Implement standardized buttons (Buddyharshal)
+- Card and Chip Display: Integrate designs into the game interface (Buddyharshal)
+- Avatar Placement: Implement dynamic avatar placement (Buddyharshal)
+
+### 3.2. Web3 Integration
+- Web3Auth: Implement user authentication (Fakename)
+- Chainlink VRF: Integrate with frontend for visible randomness (Fakename & Tetiana)
+
+### 3.3. Responsiveness and Compatibility
+- Responsive Design: Ensure mobile-first design (Buddyharshal)
+- Cross-Browser Testing: Test on major browsers (All team members)
+
+## 4. Hackathon-Specific Goals
+
+### 4.1. Morph Testnet Integration
+- Research LINK token and VRF coordinator availability (Fakename - Spike SP-20)
+- Implement and test smart contracts on Morph testnet (James & Tetiana)
+
+### 4.2. Galadriel Devnet Integration
+- Verify Chainlink VRF compatibility (Fakename - Spike SP-21)
+- Deploy and test AI agent on Galadriel devnet (Fakename)
+
+### 4.3. Demo Preparation
+- Create a compelling demo script showcasing key features (Pete)
+- Prepare visual aids and presentation materials (Buddyharshal)
+- Practice demo run-throughs (All team members)
+
+## 5. Core Reusable Components
+
+### 5.1. Smart Contract Components
+
+- PlayerManagement: Reusable player registration and management (James)
+
+- GameLogic: Core game rules and flow, adaptable for different poker variants (James)
+
+- CardManagement: Reusable card shuffling and dealing logic (Tetiana)
+
+### 5.2. UI Components
+
+- Card Component: Reusable card display with front and back views (Buddyharshal)
+
+- Player Avatar: Customizable player representation (Buddyharshal)
+
+- Betting Interface: Reusable betting controls (Buddyharshal)
+
+### 5.3. Blockchain Integration Components
+
+- Web3Auth Wrapper: Reusable authentication component (Fakename)
+
+- Chainlink VRF Integration: Modular randomness generation (Tetiana & Fakename)
+
+### 5.4. AI Components
+
+- AI Decision Module: Reusable decision-making logic for AI opponents (Fakename)
+
+- AI-Contract Interface: Standardized interface for AI interactions with smart contracts (James & Fakename)
+
+## 6. Post-Hackathon Considerations
+
+[Content remains the same]
+
+## 7. Conclusion
+
+This document serves as the roadmap for the Trustless Tricksters team during the hackathon. By focusing on these core features, integrations, and reusable components, we aim to deliver a functional and impressive Skia Poker MVP within the hackathon timeframe, while also laying the groundwork for future development and scalability.
+
+### Next Steps
+
+1. Finalize task assignments and deadlines
+
+2. Set up daily check-ins to track progress
+
+3. Prioritize core gameplay, blockchain integration, and reusable component development
+
+4. Prepare for demo day with a compelling presentation showcasing both the game and the potential for future expansion
+
+## 6. Post-Hackathon Considerations
+
+### 6.1. Advanced AI Development
+- Enhance Glitch Prophet AI with more sophisticated algorithms
+- Implement learning mechanisms for adaptive gameplay
+
+### 6.2. Animation and Visual Effects
+- Integrate subtle animations and glitch effects
+- Enhance user experience with more interactive feedback
+
+### 6.3. Additional Game Features
+- Expand multiplayer support
+- Introduce tournament mode
+
+## 7. Conclusion
+
+This document serves as the roadmap for the Trustless Tricksters team during the hackathon. By focusing on these core features and integrations, we aim to deliver a functional and impressive Skia Poker MVP within the hackathon timeframe.
+
+### Next Steps
+1. Finalize task assignments and deadlines
+2. Set up daily check-ins to track progress
+3. Prioritize core gameplay and blockchain integration
+4. Prepare for demo day with a compelling presentation
