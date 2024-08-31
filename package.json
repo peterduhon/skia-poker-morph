@@ -1,5 +1,10 @@
 {
   "dependencies": {
     "web3": "^4.12.1"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "ethereum-waffle": "^4.0.10",
+    "hardhat": "^2.22.9"
   }
 }

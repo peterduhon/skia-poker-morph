@@ -24,19 +24,18 @@ contract HandEvaluator is VRFConsumerBase  {
     uint256 public currentPlayerIndex;
     uint256[] public deck;
     uint256 public currentBet;
-    enum PlayerAction { Begin, Fold, Raise, Call, Check, AllIn }
-    GamePhase public currentPhase;
-    Card[5] public communityCards;
     uint256 public communityCardCount;
-    mapping(bytes32 => bool) public pendingRequests;
+    uint256 public roundNumber;
     uint256[52] private INITIAL_DECK = [
     0,1,2,3,4,5,6,7,8,9,10,11,12,
     13,14,15,16,17,18,19,20,21,22,23,24,25,
     26,27,28,29,30,31,32,33,34,35,36,37,38,
     39,40,41,42,43,44,45,46,47,48,49,50,51
-];
-
-    // Player data
+    ];
+    address[] public playerAddresses;
+    mapping(bytes32 => bool) public pendingRequests;
+  
+      // Player data
     struct Player {
         address addr;
         uint256 balance;
@@ -46,9 +45,9 @@ contract HandEvaluator is VRFConsumerBase  {
         Card[] hand;  // Each player has a hand of two cards
     }
     mapping(address => Player) public players;
-    address[] public playerAddresses;
-
+   
     // Card suits and values using enums
+    enum PlayerAction { Begin, Fold, Raise, Call, Check, AllIn }
     enum Suit { Spades, Hearts, Diamonds, Clubs }
     enum Value { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace }
     enum GamePhase { PreFlop, Flop, Turn, River, Showdown }
@@ -63,7 +62,9 @@ contract HandEvaluator is VRFConsumerBase  {
     FourOfAKind,
     StraightFlush,
     RoyalFlush
-}
+    }
+    GamePhase public currentPhase;
+    Card[5] public communityCards;
 
     // Card structure using enums
     struct Card {
@@ -79,20 +80,18 @@ contract HandEvaluator is VRFConsumerBase  {
         address[] activePlayers;  // Players still active in this round
     }
     BettingRound public currentRound;
-    uint256 public roundNumber;
-
+   
     // Improved Betting Logic
     struct Pot {
         uint256 amount;
         address[] eligiblePlayers;
     }
-
     
     struct SidePot {
     uint256 amount;
     address[] eligiblePlayers;
-}
-SidePot[] public sidePots;
+   }
+   SidePot[] public sidePots;
 
     
     // Events
@@ -114,6 +113,7 @@ SidePot[] public sidePots;
     event GameEnded(address[] winner);
     event BetPlaced(address player, uint256 amount);
     event PayoutProcessed(address player, uint256 amout);
+    event PhaseAdvanced(GamePhase currentPhase);
 
     // Constructor
     constructor(
@@ -184,8 +184,11 @@ SidePot[] public sidePots;
         currentPlayerIndex = 0;
         currentPhase = GamePhase.PreFlop;
         communityCardCount = 0;
-
-
+        currentBet = 0;
+        mainPot = 0;
+        for (uint8 i=0; i < sidePots.length; i++){
+            delete sidePots[i];
+        }
         collectBuyIns();
         bytes32 requestId = requestRandomness(keyHash, fee);
         pendingRequests[requestId] = true;
@@ -224,6 +227,7 @@ SidePot[] public sidePots;
 
         emit TurnManaged(msg.sender);
         nextPlayerTurn();
+        checkAndAdvancePhase();
     }
 
     function placeBet(uint256 amount) public isGameActive isPlayer {
@@ -247,7 +251,7 @@ SidePot[] public sidePots;
             lastActivePlayer[0] = getLastActivePlayer();
          endGame(lastActivePlayer);
        }
-
+     checkAndAdvancePhase();
     }
 
     function call() internal {
@@ -260,9 +264,7 @@ SidePot[] public sidePots;
 
         emit PlayerCalled(msg.sender, callAmount);
 
-       if (isRoundComplete()) {
-        advancePhase();
-       }
+       checkAndAdvancePhase();
     }
 
     function raise(uint256 amount) internal {
@@ -279,7 +281,7 @@ SidePot[] public sidePots;
       emit PlayerRaised(msg.sender, raiseAmount);
 
       resetPlayersActed();
-
+      checkAndAdvancePhase();
     }
 
     function handleAllIn(address player, uint256 allInAmount) internal {
@@ -321,6 +323,12 @@ SidePot[] public sidePots;
    revert("PokerGame: No active players found");
    }
 
+   function checkAndAdvancePhase() internal {
+    if (isRoundComplete() || allButOnePlayerFolded()) {
+        advancePhase();
+    }
+}
+
 function isRoundComplete() internal view returns (bool) {
 for (uint256 i = 0; i < playerAddresses.length; i++) {
 if (players[playerAddresses[i]].action != PlayerAction.Fold &&
@@ -329,6 +337,15 @@ return false;
 }
 }
 return true;
+}
+
+function allButOnePlayerFolded() internal view returns (bool) {
+    for (uint256 i = 0; i < playerAddresses.length; i++) {
+        if (players[playerAddresses[i]].action != PlayerAction.Fold){
+return true;
+        }
+}
+return false;
 }
 
 function resetPlayersActed() internal {
@@ -340,14 +357,8 @@ players[playerAddresses[i]].action = PlayerAction.Begin;
 }
 
     function isOnePair(Card[] memory hand) internal pure returns (bool) {
-    for (uint8 i = 0; i < hand.length - 1; i++) {
-        for (uint8 j = i + 1; j < hand.length; j++) {
-            if (hand[i].value == hand[j].value) {
-                return true;
-            }
-        }
-    }
-    return false;
+     return countValueOccurrences(hand, 2) == 1;
+    
 }
 
 function isStraight(Card[] memory hand) internal pure returns (bool) {
@@ -373,21 +384,14 @@ function isStraight(Card[] memory hand) internal pure returns (bool) {
 }
 
 function isFlush(Card[] memory hand) internal pure returns (bool) {
-    uint8[4] memory suitCounts;
-    for (uint8 i = 0; i < hand.length; i++) {
-        suitCounts[uint8(hand[i].suit)]++;
-        if (suitCounts[uint8(hand[i].suit)] == 5) {
-            return true;
-        }
-    }
-    return false;
+    return countSuitOccurrences(hand, 5);
 
 }
 
 function isRoyalFlush(Card[] memory hand)internal pure returns (bool){
     uint8[13] memory values;
         uint8[4] memory suits;
-        for (uint i = 0; i < hand.length; i++) {
+        for (uint8 i = 0; i < hand.length; i++) {
             suits[uint8(hand[i].suit)]++;
             values[uint8(hand[i].value)]++;
         }
@@ -395,44 +399,11 @@ function isRoyalFlush(Card[] memory hand)internal pure returns (bool){
 }
 
 function isStraightFlush(Card[] memory hand)internal pure returns (bool){
-    Suit suit = hand[0].suit;
-    uint8[] memory values = new uint8[](13);
-    
-    for (uint i = 1; i < 5; i++) {
-        values[i] = uint8(hand[i].value);
-        if (hand[i].suit != suit) {
-            return false;
-        }
-    }
-
-    uint8[13] memory valueCounts;
-    for (uint8 i = 0; i < hand.length; i++) {
-        valueCounts[uint8(hand[i].value)]++;
-    }
-    
-    uint8 consecutiveCount = 0;
-    for (uint8 i = 0; i < 13; i++) {
-        if (valueCounts[i] > 0) {
-            consecutiveCount++;
-            if (consecutiveCount == 5) return true;
-        } else {
-            consecutiveCount = 0;
-        }
-    }
-    return true;
+    return isFlush(hand) && isStraight(hand);
 }
 
 function isFourOfAKind(Card[] memory hand)internal pure returns (bool){
-uint8[4] memory valueCounts;
-    for (uint8 i = 0; i < hand.length; i++) {
-        valueCounts[uint8(hand[i].value)]++;
-        if (valueCounts[uint8(hand[i].value)]==4){
-            return true;
-        }
-    }
-  
-    return false;
-
+return countValueOccurrences(hand, 4) == 1;
 }
 
 function isFullHouse(Card[] memory hand)internal pure returns (bool){
@@ -453,34 +424,39 @@ function isFullHouse(Card[] memory hand)internal pure returns (bool){
 }
 
 function isThreeOfAKind(Card[] memory hand) public pure returns (bool) {
-    
-    uint8[4] memory valueCounts;
-    for (uint8 i = 0; i < hand.length; i++) {
-        valueCounts[uint8(hand[i].value)]++;
-        if (valueCounts[uint8(hand[i].value)]==3){
-            return true;
-        }
-    }
-  
-    return false;
+    return countValueOccurrences(hand, 3) == 1;   
 }
 
 function isTwoPairs(Card[] memory hand) public pure returns (bool) {
- uint8[13] memory values;
+ return countValueOccurrences(hand, 2) == 2;
+}
+
+function countValueOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (uint8) {
+        uint8[13] memory values;
         for (uint8 i = 0; i < hand.length; i++) {
             values[uint8(hand[i].value)]++;
         }
         uint8 count = 0;
-        for (uint8 i = 0; i < values.length; i++) {
-            if (values[i] == 2) {
+        for (uint8 i = 0; i < 13; i++) {
+            if (values[i] == occurrence) {
                 count++;
             }
-            if (count==2){
+        }
+        return count;
+    }
+
+    function countSuitOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (bool) {
+        uint8[4] memory suits;
+        for (uint8 i = 0; i < hand.length; i++) {
+            suits[uint8(hand[i].suit)]++;
+        }
+        for (uint8 i = 0; i < 4; i++) {
+            if (suits[i] >= occurrence) {
                 return true;
             }
         }
         return false;
-}
+    }
 
 function getHighCard(Card[] memory hand) internal pure returns (uint256) {
     uint256 highCardValue = 0;
@@ -527,102 +503,74 @@ function getPairValue(Card[] memory hand) internal pure returns (uint256) {
 }
 
 function getFourOfAKindValue(Card[] memory hand) internal pure returns (uint256) {
-    uint256 fourOfAKindValue = 0;
-    uint256 kickerValue = 0;
-
-    uint8[4] memory valueCounts;
-    for (uint8 i = 0; i < hand.length; i++) {
-        valueCounts[uint8(hand[i].value)]++;
-        if (valueCounts[uint8(hand[i].value)]==4){
-            fourOfAKindValue=uint8(hand[i].value);
+    uint256[13] memory values;
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
         }
-    }
-       
-            kickerValue = valueCounts[valueCounts.length -1];
-            
-       return fourOfAKindValue * 1000000 + kickerValue;
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 4) {
+                return i;
+            }
+        }
+        revert("No Four of a Kind found");
 }
 
 function getFullHouseValue(Card[] memory hand) internal pure returns (uint256) {
-    uint256 threeOfAKindValue = 0;
-    uint256 pairValue = 0;
-
-    uint8[4] memory valueCounts;
-
-    for (uint256 i = 0; i < hand.length; i++) {
-        Value currentValue = hand[i].value;
-        valueCounts[i]++;
-
-        if (valueCounts[i] == 3) {
-            threeOfAKindValue = uint256(currentValue);
-        } else if (valueCounts[i] == 2) {
-            pairValue = uint256(currentValue);
+    uint256[13] memory values;
+        uint256 threeOfAKindValue;
+        uint256 pairValue;
+        for (uint256 i = 0; i < hand.length; i++) {
+            values[uint256(hand[i].value)]++;
         }
-    }
-
-    return threeOfAKindValue * 1000000 + pairValue;
+        for (uint256 i = 0; i < 13; i++) {
+            if (values[i] == 3) {
+                threeOfAKindValue = i;
+            } else if (values[i] == 2) {
+                pairValue = i;
+            }
+        }
+        if (threeOfAKindValue != 0 && pairValue != 0) {
+            return threeOfAKindValue * 100 + pairValue;
+        }
+        revert("No Full House found");
 }
 
 function getFlushValue(Card[] memory hand) internal pure returns (uint256) {
-    uint256[5] memory flushValues;
-
-      for (uint256 i = 0; i < hand.length; i++) {
-        bool inserted = false;
-        for (uint256 j = 0; j < 5; j++) {
-            if (!inserted && uint256(hand[i].value) > flushValues[j]) {
-                for (uint256 k = 4; k > j; k--) {
-                    flushValues[k] = flushValues[k - 1];
+        uint256[13] memory values;
+        uint256[4] memory suits;
+        for (uint256 i = 0; i < hand.length; i++) {
+            suits[uint256(hand[i].suit)]++;
+            values[uint256(hand[i].value)]++;
+        }
+        uint256 highCard = 0;
+        for (uint256 i = 0; i < 4; i++) {
+            if (suits[i] >= 5) {
+                for (uint256 j = 0; j < hand.length; j++) {
+                    if (uint256(hand[j].suit) == i) {
+                        highCard = highCard < uint256(hand[j].value) ? uint256(hand[j].value) : highCard;
+                    }
                 }
-                flushValues[j] = uint256(hand[i].value);
-                inserted = true;
-                break;
+                return highCard;
             }
         }
-        if (!inserted) {
-            flushValues[4] = uint256(hand[i].value);
-        }
+        revert("No Flush found");
     }
-
-    // Calculate the flush value
-    uint256 flushValue = 0;
-    for (uint256 i = 0; i < 5; i++) {
-        flushValue = flushValue * 13 + flushValues[i];
-    }
-
-    return flushValue;
-}
 
 function getStraightValue(Card[] memory hand) internal pure returns (uint256) {
-    uint8[13] memory valueCounts;
-    uint256 straightValue = 0;
-
+    uint256[13] memory values;
         for (uint256 i = 0; i < hand.length; i++) {
-        valueCounts[uint8(hand[i].value)]++;
-    }
-
-       for (uint8 i = 12; i >= 4; i--) {
-        if (valueCounts[i] > 0) {
-            bool straight = true;
-            for (uint8 j = 0; j < 5; j++) {
-                if (valueCounts[i - j] == 0) {
-                    straight = false;
-                    break;
-                }
-            }
-            if (straight) {
-                straightValue = i;
-                break;
+            values[uint256(hand[i].value)]++;
+        }
+        for (uint256 i = 0; i < 9; i++) {
+            if (values[i] > 0 && values[i+1] > 0 && values[i+2] > 0 && values[i+3] > 0 && values[i+4] > 0) {
+                return i + 4;
             }
         }
-    }
-
-       if (straightValue == 0) {
-        if (valueCounts[0] > 0 && valueCounts[1] > 0 && valueCounts[2] > 0 && valueCounts[3] > 0 && valueCounts[12] > 0) {
-            straightValue = 3;
+        // Special case for Ace-low straight
+        if (values[12] > 0 && values[0] > 0 && values[1] > 0 && values[2] > 0 && values[3] > 0) {
+            return 3; // 5 in Ace-low straight
         }
-    }
-
-    return straightValue;
+        revert("No Straight found");
 }
 
 function getThreeOfAKindValue(Card[] memory hand) internal pure returns (uint256) {
@@ -680,6 +628,12 @@ function getTwoPairsValue(Card[] memory hand) internal pure returns (uint256) {
 
         revert("No Two Pairs found");
 }
+
+function getStraightFlushValue(Card[] memory hand) internal pure returns (uint256) {
+        uint256 straightValue = getStraightValue(hand);
+        uint256 flushValue = getFlushValue(hand);
+        return straightValue > flushValue ? straightValue : flushValue;
+    }
 
      function distributePots() internal {
         require(currentPhase == GamePhase.Showdown, "PokerGame: Cannot distribute pots before showdown");
@@ -825,6 +779,7 @@ function advancePhase() public onlyOwner {
     }
 
     resetBettingRound();
+    emit PhaseAdvanced(currentPhase);
 }
 
 function resetBettingRound() internal {
@@ -893,29 +848,12 @@ function resetBettingRound() internal {
     }
 
     function determineWinners() internal view returns (address[] memory) {
-        uint256 bestHandValue = 0;
-        uint256 winnerCount = 0;
+        
+       uint256 bestHandValue = countBestHandValue();
+       uint256 winnerCount = countWinners(bestHandValue);
         
         // First pass: Find the best hand value
-        for (uint i = 0; i < playerAddresses.length; i++) {
-            address player = playerAddresses[i];
-            if (players[player].action != PlayerAction.Fold) {
-                Card[] memory fullHand;
-                fullHand[0] = players[player].hand[0];
-                fullHand[1] = players[player].hand[1];
-                for (uint j = 0; j < 5; j++) {
-                    fullHand[j + 2] = communityCards[j];
-                }
-
-                uint256 handValue = evaluateHand(fullHand);
-                if (handValue > bestHandValue) {
-                    bestHandValue = handValue;
-                    winnerCount = 1;
-                } else if (handValue == bestHandValue) {
-                    winnerCount++;
-                }
-            }
-        }
+        
         address[] memory winners = new address[](winnerCount);
         uint256 index = 0;
         for (uint i = 0; i < playerAddresses.length; i++) {
@@ -937,6 +875,52 @@ function resetBettingRound() internal {
         }
 
         return winners;
+    }
+
+    function countBestHandValue() public view returns (uint256){
+      uint256 bestHandValue = 0;
+        for (uint i = 0; i < playerAddresses.length; i++) {
+            address player = playerAddresses[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue > bestHandValue) {
+                    bestHandValue = handValue;
+                   
+                } 
+            }
+        }
+        return bestHandValue;
+    }
+
+    function countWinners(uint bestHand)public view returns (uint256){
+         uint256 winnerCount = 0;
+         for (uint i = 0; i < playerAddresses.length; i++) {
+            address player = playerAddresses[i];
+            if (players[player].action != PlayerAction.Fold) {
+                Card[] memory fullHand;
+                fullHand[0] = players[player].hand[0];
+                fullHand[1] = players[player].hand[1];
+                for (uint j = 0; j < 5; j++) {
+                    fullHand[j + 2] = communityCards[j];
+                }
+
+                uint256 handValue = evaluateHand(fullHand);
+                if (handValue > bestHand) {
+                    bestHand = handValue;
+                    winnerCount = 1;
+                } else if (handValue == bestHand) {
+                    winnerCount++;
+                }
+            }
+        }
+        return winnerCount;
     }
 
 
@@ -985,8 +969,6 @@ function determineWinnersForSidePot(address[] memory eligiblePlayers) internal v
                 }
             }
         }
-
         return winners;
     }
-
 }
