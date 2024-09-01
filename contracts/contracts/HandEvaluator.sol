@@ -3,6 +3,8 @@
 pragma solidity ^0.8.19;
 
 import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 
 /// @title A contract for a poker game
@@ -10,13 +12,13 @@ import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
 /// @notice This contract manages a poker game with multiple players
 /// @dev All function calls are currently implemented without side effects
 
-contract HandEvaluator is VRFConsumerBase  {
+contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
     // Chainlink VRF variables
     bytes32 internal keyHash;
     uint256 internal fee;
 
     // Game state variables
-    address public owner;
+    //address public owner;
     uint256 public buyInAmount;
     uint256 public currentPot;
     uint256 public mainPot;
@@ -122,19 +124,14 @@ contract HandEvaluator is VRFConsumerBase  {
         bytes32 _keyHash,
         uint256 _fee
     ) VRFConsumerBase(_vrfCoordinator, _linkToken) {
-        owner = msg.sender;
-        buyInAmount = 0.1 ether;
+         buyInAmount = 0.1 ether;
         keyHash = _keyHash;
         fee = _fee;
         initializeDeck();
     }
 
     // Modifiers for validation
-    modifier onlyOwner() {
-        require(msg.sender == owner, "PokerGame: Caller is not the contract owner");
-        _;
-    }
-
+   
     modifier isGameActive() {
         require(gameActive, "PokerGame: A game is not active.");
         _;
@@ -150,16 +147,7 @@ contract HandEvaluator is VRFConsumerBase  {
         _;
     }
 
-    modifier nonReentrant() {
-        require(!reentrant, "PokerGame: Reentrancy detected");
-        reentrant = true;
-        _;
-        reentrant = false;
-    }
-
-    bool private reentrant;  // State variable to track reentrancy
-
-    // Player Registration with EOA Check
+       // Player Registration with EOA Check
     function registerPlayer() external isEOA {
         require(!players[msg.sender].registered, "PokerGame: Player already registered");
 
@@ -215,14 +203,16 @@ contract HandEvaluator is VRFConsumerBase  {
     require(players[msg.sender].balance >= betAmount, "PokerGame: Insufficient balance");
 
         // Handle different actions
-        if (betAmount == 0) {
+        if (betAmount == players[msg.sender].balance) {
+           handleAllIn(msg.sender, betAmount);
+        } else if (betAmount == 0) {
             fold();
         } else if (betAmount == currentRound.betAmount) {
             call();
         } else if (betAmount > currentRound.betAmount) {
             raise(betAmount);
         } else {
-            revert("PokerGame: Invalid bet amount");
+            placeBet(betAmount);
         }
 
         emit TurnManaged(msg.sender);
@@ -356,7 +346,7 @@ players[playerAddresses[i]].action = PlayerAction.Begin;
 }
 }
 
-    function isOnePair(Card[] memory hand) internal pure returns (bool) {
+function isOnePair(Card[] memory hand) internal pure returns (bool) {
      return countValueOccurrences(hand, 2) == 1;
     
 }
@@ -445,7 +435,7 @@ function countValueOccurrences(Card[] memory hand, uint8 occurrence) internal pu
         return count;
     }
 
-    function countSuitOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (bool) {
+function countSuitOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (bool) {
         uint8[4] memory suits;
         for (uint8 i = 0; i < hand.length; i++) {
             suits[uint8(hand[i].suit)]++;
@@ -689,21 +679,21 @@ emit GameEnded(winnersArray);
         }
     }
 
-    function startNewRound() external onlyOwner {
-        require(!gameActive, "PokerGame: Game is already in progress");
-        roundNumber++;
+function startNewRound() external onlyOwner {
+    require(!gameActive, "PokerGame: Game is already in progress");
+    roundNumber++;
 
-        currentRound.betAmount = buyInAmount;
-        currentRound.totalPot = 0;
-        currentRound.activePlayers = playerAddresses;
+    currentRound.betAmount = buyInAmount;
+    currentRound.totalPot = 0;
+    currentRound.activePlayers = playerAddresses;
         for (uint256 i = 0; i < currentRound.activePlayers.length; i++) currentRound.playerBets[playerAddresses[i]] = 0;
         emit NewRoundStarted(roundNumber);
     }
 
-    function endCurrentRound() external onlyOwner {
+function endCurrentRound() external onlyOwner {
         // Logic to resolve betting round, determine actions, and prepare for the next round
         resetRound();
-    }
+}
 
     function resetRound() internal {
         // Reset currentRound state variables for the next round
@@ -776,9 +766,9 @@ function advancePhase() public onlyOwner {
         dealCommunityCards();
     } else if (currentPhase == GamePhase.River) {
         currentPhase = GamePhase.Showdown;
+         initiateShowdown();
     }
-
-    resetBettingRound();
+    
     emit PhaseAdvanced(currentPhase);
 }
 
@@ -790,7 +780,15 @@ function resetBettingRound() internal {
     currentPlayerIndex = 0; 
 }
 
-
+function initiateShowdown()internal {
+    address[] memory winners;
+    //address[] memory winnersForSidePot = sidePots.eligiblePlayers;
+    winners = determineWinners();
+    // there should be payment process
+    //determineWinnersForSidePot(winnersForSidePot);
+    //there should be payment process
+endGame(winners);
+}
 
     function drawCard() internal returns (Card memory) {
         uint256 cardIndex = deck[deck.length - 1];
@@ -820,14 +818,14 @@ function resetBettingRound() internal {
         currentPlayerIndex = (currentPlayerIndex + 1) % playerAddresses.length;
     }
 
-    function endGame(address[] memory winner) public onlyOwner {
+    function endGame(address[] memory winners) public onlyOwner {
         require(gameActive, "PokerGame: Game is not in progress");
         gameActive = false;
         delete communityCards;
         communityCardCount = 0;
         currentPhase = GamePhase.PreFlop;
 
-        emit GameEnded(winner);
+        emit GameEnded(winners);
     }
 
     function evaluateHand(Card[] memory hand) internal pure returns (uint256) {
