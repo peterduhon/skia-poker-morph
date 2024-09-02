@@ -30,6 +30,7 @@ contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
     uint256 public currentBet;
     uint256 public communityCardCount;
     uint256 public roundNumber;
+    uint256 public currentGameId;
     uint256[52] private INITIAL_DECK = [
     0,1,2,3,4,5,6,7,8,9,10,11,12,
     13,14,15,16,17,18,19,20,21,22,23,24,25,
@@ -130,7 +131,6 @@ event NewRoundStarted(uint256 roundNumber);
 event RoundEnded(uint256 roundNumber);
 event RandomnessFailed(bytes32 requestId);
 event CardDealt(address indexed player, Card card);
-event PhaseAdvanced(GamePhase currentPhase);
 
     // Game flow events
 event GameStarted(uint256 gameId, address[] players);
@@ -208,12 +208,19 @@ event PotCreated(uint256 potIndex, uint256 amount);
         emit PlayerRegistered(msg.sender);
     }
 
+    function setGameId(uint256 _gameId) external onlyOwner {
+        currentGameId = _gameId;
+    }
+
     // Start the Game
-    function startGame() external onlyOwner {
+    function startGame(uint256 _gameId, uint256 _buyInAmount, uint256 _maxPlayers) external onlyOwner {
         require(!gameActive, "PokerGame: Game is already in progress");
         require(playerAddresses.length >=2, "PokerGame: Not enough players to start the game");
         require(LINK.balanceOf(address(this)) >= fee, "PokerGame: Not enough LINK to request randomness");
+        require(currentGameId != 0, "Game ID not set");
 
+        currentGameId = _gameId;
+        buyInAmount = _buyInAmount;
         gameActive = true;
         currentPot = 0;
         currentPlayerIndex = 0;
@@ -228,7 +235,7 @@ event PotCreated(uint256 potIndex, uint256 amount);
         bytes32 requestId = requestRandomness(keyHash, fee);
         pendingRequests[requestId] = true;
         emit RandomnessRequested(requestId);
-       // emit GameStarted();   ?? gameId
+        emit GameStarted(currentGameId, playerAddresses);
     }
 
     // Collect Buy-ins
@@ -271,7 +278,7 @@ event PotCreated(uint256 potIndex, uint256 amount);
         require(amount >= currentRound.betAmount, "PokerGame: Bet amount too low");
         require(userManagement.getUserBalance(msg.sender) >= amount, "PokerGame: Insufficient balance");
 
-        userManagement.minusBalance(msg.sender, uint256(amount));
+        userManagement.decreaseBalance(msg.sender, amount);
         currentRound.playerBets[msg.sender] += amount;
         currentRound.totalPot += amount;
 
@@ -679,7 +686,7 @@ function getStraightFlushValue(Card[] memory hand) internal pure returns (uint25
         address[] memory mainWinners = determineWinners();
         uint256 mainPotShare = mainPot / mainWinners.length;
         for (uint256 i = 0; i < mainWinners.length; i++) {
-          userManagement.updateBalance(mainWinners[i], uint256(mainPotShare)); 
+          userManagement.increaseBalance(mainWinners[i], mainPotShare); 
           emit PayoutProcessed(mainWinners[i], mainPotShare);
 }
 // Distribute side pots
@@ -818,7 +825,7 @@ function advancePhase() public onlyOwner {
          initiateShowdown();
     }
     
-    emit PhaseAdvanced(currentPhase);
+    emit GamePhaseChanged(currentPhase);
 }
 
 function resetBettingRound() internal {

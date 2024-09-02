@@ -42,21 +42,19 @@ contract UserManagement is Ownable, AccessControl {
 
     /**
      * @dev Updates the balance of a user (can only be called by authorized entities).
-     * @param _user The address of the user.
-     * @param _amount The amount to add or subtract from the user's balance.
+     * @param user The address of the user.
+     * @param amount The amount to add or subtract from the user's balance.
      */
-    function updateBalance(address _user, uint256 _amount) external onlyRole(GAME_CONTRACT_ROLE) {
-        require(users[_user].balance + _amount >= users[_user].balance, "Overflow error");
-        users[_user].balance += _amount;
 
-        emit BalanceUpdated(_user, users[_user].balance);
+    function decreaseBalance(address user, uint256 amount) public onlyRole(GAME_CONTRACT_ROLE) {
+        require(users[user].balance >= amount, "Insufficient balance");
+        users[user].balance -= amount;
+        emit BalanceUpdated(user, users[user].balance);
     }
 
-    function minusBalance(address _user, uint256 _amount) external onlyRole(GAME_CONTRACT_ROLE) {
-        require(users[_user].balance + _amount >= users[_user].balance, "Overflow error");
-        users[_user].balance -= _amount;
-
-        emit BalanceUpdated(_user, users[_user].balance);
+    function increaseBalance(address user, uint256 amount) public onlyRole(GAME_CONTRACT_ROLE) {
+        users[user].balance += amount;
+        emit BalanceUpdated(user, users[user].balance);
     }
 
     /**
