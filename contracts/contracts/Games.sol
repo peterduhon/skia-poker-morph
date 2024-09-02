@@ -4,10 +4,35 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+/**
+ * @title GameManagement
+ * @dev This contract manages game rooms, including creation and status updates.
+ */
 contract GameManagement is Ownable, AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     enum GameStatus { Waiting, Active, Completed }
+    enum PlayerAction { Begin, Fold, Raise, Call, Check, AllIn }
+    enum Suit { Spades, Hearts, Diamonds, Clubs }
+    enum Value { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace }
+
+    /**
+     * @dev Struct representing a playing card.
+     * @param suit The suit of the card.
+     * @param value The value of the card.
+     */
+    struct Card {
+        Suit suit;
+        Value value;
+    }
+
+    struct Player {
+        address addr;
+        string nickName;
+        uint256 chips;
+        uint256 position;
+        PlayerAction status;
+    }
     
     struct GameRoom {
         uint256 id;
@@ -33,25 +58,24 @@ contract GameManagement is Ownable, AccessControl {
      * @dev Creates a new game room.
      * @param _buyInAmount The buy-in amount for the game.
      * @param _maxPlayers The maximum number of players allowed in the game.
+     * @return The ID of the newly created game room.
      */
-    function createGameRoom(uint256 _buyInAmount, uint256 _maxPlayers) external onlyRole(ADMIN_ROLE) {
+    function createGameRoom(uint256 _buyInAmount, uint256 _maxPlayers) external onlyRole(ADMIN_ROLE) returns (uint256) {
         require(_buyInAmount > 0, "Buy-in amount must be greater than 0");
         require(_maxPlayers > 1, "Number of players must be greater than 1");
 
         uint256 gameId = nextGameId++;
-        GameRoom memory newRoom = GameRoom({
-            id: gameId,
-            creator: msg.sender,
-            buyInAmount: _buyInAmount,
-            maxPlayers: _maxPlayers,
-            createdAt: block.timestamp,
-            status: GameStatus.Waiting
-        });
-
-        gameRooms[gameId] = newRoom;
+        gameRooms[gameId].id = gameId;
+        gameRooms[gameId].creator = msg.sender;
+        gameRooms[gameId].buyInAmount = _buyInAmount;
+        gameRooms[gameId].maxPlayers = _maxPlayers;
+        gameRooms[gameId].createdAt = block.timestamp;
+        gameRooms[gameId].status = GameStatus.Waiting;
+    
         userGames[msg.sender].push(gameId);
 
         emit GameRoomCreated(gameId, msg.sender, _buyInAmount, _maxPlayers);
+        return gameId;
     }
 
     /**

@@ -30,14 +30,12 @@ contract UserManagement is Ownable, AccessControl {
         require(bytes(users[msg.sender].username).length == 0, "User already registered");
         require(msg.value > 0, "Initial balance must be greater than 0");
 
-        users[msg.sender] = User({
-            userAddress: msg.sender,
-            username: _username,
-            balance: msg.value
-        });
+        users[msg.sender].userAddress = msg.sender;
+        users[msg.sender].username = _username;
+        users[msg.sender].balance = msg.sender.balance;
 
         emit UserRegistered(msg.sender, _username);
-        emit BalanceUpdated(msg.sender, msg.value);
+        emit BalanceUpdated(msg.sender, msg.sender.balance);
     }
 
     /**
