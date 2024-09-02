@@ -5,7 +5,7 @@ pragma solidity ^0.8.19;
 import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-
+import "./UserManagement.sol";
 
 /// @title A contract for a poker game
 /// @author James Wong
@@ -16,6 +16,8 @@ contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
     // Chainlink VRF variables
     bytes32 internal keyHash;
     uint256 internal fee;
+
+    UserManagement public userManagement;
 
     // Game state variables
     //address public owner;
@@ -96,7 +98,7 @@ contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
    SidePot[] public sidePots;
 
     
-    // Events
+    /* // Events
     event PlayerRegistered(address indexed player);
     event CardDealt(address indexed player, Card card);
     event TurnManaged(address indexed player);
@@ -115,16 +117,61 @@ contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
     event GameEnded(address[] winner);
     event BetPlaced(address player, uint256 amount);
     event PayoutProcessed(address player, uint256 amout);
-    event PhaseAdvanced(GamePhase currentPhase);
+    event PhaseAdvanced(GamePhase currentPhase); */
+
+    //Old event
+event PlayerRegistered(address indexed player);
+event RandomnessRequested(bytes32 requestId);
+event TurnManaged(address indexed player);
+event PlayerBetPlaced(address indexed player, uint256 amount);
+event PayoutProcessed(address player, uint256 amout);
+event GameEnded(address[] winner);
+event NewRoundStarted(uint256 roundNumber);
+event RoundEnded(uint256 roundNumber);
+event RandomnessFailed(bytes32 requestId);
+event CardDealt(address indexed player, Card card);
+event PhaseAdvanced(GamePhase currentPhase);
+
+    // Game flow events
+event GameStarted(uint256 gameId, address[] players);
+event GamePhaseChanged(GamePhase newPhase);
+event PlayerTurnStarted(address player);
+
+// Betting events
+event BettingRoundStarted(uint256 roundNumber);
+event BettingRoundEnded(uint256 roundNumber, uint256 potSize);
+
+// Card-related events
+event CommunityCardsDealt(uint256 phase, Card[] cards);
+event PlayerCardsDealt(address player); // Don't emit actual cards for privacy
+
+// Showdown events
+event MainPotDistributed(address winner, uint256 amount);
+event SidePotDistributed(uint256 potIndex, address winner, uint256 amount);
+event ShowdownCompleted(address[] winners);
+
+// Player action events
+event PlayerChecked(address player);
+event PlayerCalled(address player, uint256 amount);
+event PlayerRaised(address player, uint256 amount);
+event PlayerFolded(address player);
+event PlayerWentAllIn(address player, uint256 amount);
+
+// Other important events
+event PlayerJoinedGame(address player);
+event PlayerLeftGame(address player);
+event PotCreated(uint256 potIndex, uint256 amount);
 
     // Constructor
     constructor(
+        address _userManagement,
         address _vrfCoordinator,
         address _linkToken,
         bytes32 _keyHash,
         uint256 _fee
     ) VRFConsumerBase(_vrfCoordinator, _linkToken) {
-         buyInAmount = 0.1 ether;
+        userManagement = UserManagement(_userManagement);
+        buyInAmount = 0.1 ether;
         keyHash = _keyHash;
         fee = _fee;
         initializeDeck();
@@ -181,7 +228,7 @@ contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
         bytes32 requestId = requestRandomness(keyHash, fee);
         pendingRequests[requestId] = true;
         emit RandomnessRequested(requestId);
-        emit GameStarted();
+       // emit GameStarted();   ?? gameId
     }
 
     // Collect Buy-ins
@@ -221,10 +268,10 @@ contract HandEvaluator is VRFConsumerBase, Ownable, ReentrancyGuard  {
     }
 
     function placeBet(uint256 amount) public isGameActive isPlayer {
-        require(amount >= currentRound.betAmount, "PokerGame: Bet amount too low. Minimum bet: {currentRound.betAmount}, Your bet: {amount}");
-    require(players[msg.sender].balance >= amount, "PokerGame: Insufficient balance. Required: {amount}, Your balance: {players[msg.sender].balance}");
+        require(amount >= currentRound.betAmount, "PokerGame: Bet amount too low");
+        require(userManagement.getUserBalance(msg.sender) >= amount, "PokerGame: Insufficient balance");
 
-        players[msg.sender].balance -= amount;
+        userManagement.minusBalance(msg.sender, uint256(amount));
         currentRound.playerBets[msg.sender] += amount;
         currentRound.totalPot += amount;
 
@@ -339,9 +386,9 @@ return false;
 }
 
 function resetPlayersActed() internal {
-for (uint256 i = 0; i < playerAddresses.length; i++) {
-if (players[playerAddresses[i]].action != PlayerAction.Fold) {
-players[playerAddresses[i]].action = PlayerAction.Begin;
+  for (uint256 i = 0; i < playerAddresses.length; i++) {
+  if (players[playerAddresses[i]].action != PlayerAction.Fold) {
+  players[playerAddresses[i]].action = PlayerAction.Begin;
 }
 }
 }
@@ -632,8 +679,8 @@ function getStraightFlushValue(Card[] memory hand) internal pure returns (uint25
         address[] memory mainWinners = determineWinners();
         uint256 mainPotShare = mainPot / mainWinners.length;
         for (uint256 i = 0; i < mainWinners.length; i++) {
-        players[mainWinners[i]].balance += mainPotShare;
-        emit PayoutProcessed(mainWinners[i], mainPotShare);
+          userManagement.updateBalance(mainWinners[i], uint256(mainPotShare)); 
+          emit PayoutProcessed(mainWinners[i], mainPotShare);
 }
 // Distribute side pots
 for (uint256 i = 0; i < sidePots.length; i++) {
@@ -725,7 +772,7 @@ function endCurrentRound() external onlyOwner {
         }
     }
 
-    function dealCommunityCards() internal {
+function dealCommunityCards() internal {
      require(currentPhase != GamePhase.PreFlop && currentPhase != GamePhase.Showdown, 
         "PokerGame: Cannot deal community cards in PreFlop or Showdown phase. Current phase: {uint(currentPhase)}");
     
@@ -740,8 +787,10 @@ function endCurrentRound() external onlyOwner {
         communityCards[communityCardCount] = drawCard();
         emit CardDealt(address(0), communityCards[communityCardCount]); // address(0) indicates it's a community card
         communityCardCount++;
-    }
 }
+
+    // ???emit CommunityCardsDealt(roundNumber, communityCards[communityCardCount]);
+  }
 
 function getCommunityCards() external view returns (Card[] memory) {
     Card[] memory cards = new Card[](communityCardCount);
@@ -780,14 +829,33 @@ function resetBettingRound() internal {
     currentPlayerIndex = 0; 
 }
 
-function initiateShowdown()internal {
-    address[] memory winners;
-    //address[] memory winnersForSidePot = sidePots.eligiblePlayers;
-    winners = determineWinners();
-    // there should be payment process
-    //determineWinnersForSidePot(winnersForSidePot);
-    //there should be payment process
-endGame(winners);
+function initiateShowdown() internal {
+    require(currentPhase == GamePhase.Showdown, "Not in showdown phase");
+    
+    // Determine winners for main pot
+    address[] memory mainPotWinners = determineWinners();
+    uint256 mainPotShare = mainPot / mainPotWinners.length;
+    
+    for (uint256 i = 0; i < mainPotWinners.length; i++) {
+        players[mainPotWinners[i]].balance += mainPotShare;
+        emit MainPotDistributed(mainPotWinners[i], mainPotShare);
+    }
+    
+    // Handle side pots
+    for (uint256 i = 0; i < sidePots.length; i++) {
+        address[] memory sidePotWinners = determineWinnersForSidePot(sidePots[i].eligiblePlayers);
+        uint256 sidePotShare = sidePots[i].amount / sidePotWinners.length;
+        
+        for (uint256 j = 0; j < sidePotWinners.length; j++) {
+            players[sidePotWinners[j]].balance += sidePotShare;
+            emit SidePotDistributed(i, sidePotWinners[j], sidePotShare);
+        }
+    }
+    
+    // Reset game state
+    resetGameState(mainPotWinners);
+    
+    emit ShowdownCompleted(mainPotWinners);
 }
 
     function drawCard() internal returns (Card memory) {
@@ -824,7 +892,7 @@ endGame(winners);
         delete communityCards;
         communityCardCount = 0;
         currentPhase = GamePhase.PreFlop;
-
+        emit GamePhaseChanged(currentPhase);
         emit GameEnded(winners);
     }
 
