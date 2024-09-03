@@ -1,39 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./Common.sol";
 
 contract GameManagement is Ownable, AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-
-    enum GameStatus { Waiting, Active, Completed }
-    enum PlayerAction { Begin, Fold, Raise, Call, Check, AllIn }
-    enum Suit { Spades, Hearts, Diamonds, Clubs }
-    enum Value { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace }
-
-    struct Card {
-        Suit suit;
-        Value value;
-    }
-
-    struct Player {
-        address addr;
-        string nickName;
-        uint256 chips;
-        uint256 position;
-        PlayerAction status;
-    }
-    
-    struct GameRoom {
-        uint256 id;
-        address creator;
-        uint256 buyInAmount;
-        uint256 maxPlayers;
-        uint256 createdAt;
-        GameStatus status;
-    }
-    
+ 
     uint256 public nextGameId;
     mapping(uint256 => GameRoom) public gameRooms;
     mapping(address => uint256[]) public userGames;
@@ -42,7 +16,7 @@ contract GameManagement is Ownable, AccessControl {
     event GameRoomStatusUpdated(uint256 indexed gameId, GameStatus newStatus);
 
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(ADMIN_ROLE, msg.sender);
     }
 
     function createGameRoom(uint256 _buyInAmount, uint256 _maxPlayers) external onlyRole(ADMIN_ROLE) returns (uint256) {

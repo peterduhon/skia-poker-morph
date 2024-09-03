@@ -1,21 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Common.sol";
 
 contract RoomManagement is Ownable {
-    struct Room {
-        uint256 id;
-        uint256 buyInAmount;
-        mapping(address => PlayerInfo) playerInfos;
-        address[] players;
-    }
-
-    struct PlayerInfo {
-        string nickName;
-        uint256 chips;
-    }
-
     mapping(uint256 => Room) public rooms;
 
     event RoomCreated(uint256 roomId, uint256 buyInAmount);

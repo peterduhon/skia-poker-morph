@@ -1,30 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Common.sol";
 
 contract CardManagement is Ownable {
-    
-    enum Suit { Spades, Hearts, Diamonds, Clubs }
-    enum Value { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace }
-
-    struct Card {
-        Suit suit;
-        Value value;
-    }
-    
-    enum HandRanking {
-        HighCard,
-        OnePair,
-        TwoPairs,
-        ThreeOfAKind,
-        Straight,
-        Flush,
-        FullHouse,
-        FourOfAKind,
-        StraightFlush,
-        RoyalFlush
-    }
 
     function isPair(Card[] memory hand) internal pure returns (bool) {
         return countValueOccurrences(hand, 2) == 1;

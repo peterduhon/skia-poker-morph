@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -7,42 +7,9 @@ import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
 import "./Cards.sol";
 import "./Rooms.sol";
 import "./Users.sol";
+import "./Common.sol";
 
 contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
-    enum GameState {
-        WaitingForPlayers,
-        PreFlop,
-        Flop,
-        Turn,
-        River,
-        Showdown,
-        Finished
-    }
-
-    enum PlayerAction {
-        None,
-        Fold,
-        Check,
-        Call,
-        Bet,
-        Raise,
-        AllIn
-    }
-
-    struct Player {
-        address addr;
-        uint256 balance;
-        uint256 currentBet;
-        PlayerAction action;
-        bool isActive;
-        bool hasActed;
-    }
-
-    struct Pot {
-        uint256 amount;
-        address[] eligiblePlayers;
-    }
-
     GameState public gameState;
     uint256 public minimumBet;
     uint256 public currentBet;
@@ -51,9 +18,9 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
 
     address[] public playersList;
     mapping(address => Player) public players;
-    mapping(address => CardManagement.Card[]) public playerHands; // Keep track of player hands
-    CardManagement.Card[] public communityCards;
-    CardManagement.Card[] public deck;
+    mapping(address => Card[]) public playerHands;
+    Card[] public communityCards;
+    Card[] public deck;
     Pot[] public pots;
 
     CardManagement public cardManagement;
@@ -78,8 +45,8 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
     event RoundEnded();
     event GameEnded();
     event DeckShuffled();
-    event CardsDealt(address indexed player, CardManagement.Card[] hand);
-    event CommunityCardsDealt(CardManagement.Card[] communityCards);
+    event CardsDealt(address indexed player, Card[] hand);
+    event CommunityCardsDealt(Card[] communityCards);
     event DeckReset();
 
     modifier inGameState(GameState _state) {
@@ -133,7 +100,9 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         uint256 deckSize = deck.length;
         for (uint256 i = 0; i < deckSize; i++) {
             uint256 j = randomResult % deckSize;
-            (deck[i], deck[j]) = (deck[j], deck[i]);
+            Card memory temp = deck[i];
+            deck[i] = deck[j];
+            deck[j] = deck[i];
         }
     }
 
@@ -141,7 +110,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         delete deck;
         for (uint8 suit = 0; suit < 4; suit++) {
             for (uint8 value = 0; value < 13; value++) {
-                deck.push(CardManagement.Card(CardManagement.Suit(suit), CardManagement.Value(value)));
+                deck.push(Card(Suit(suit), Value(value)));
             }
         }
         shuffleDeck();
@@ -151,7 +120,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         delete deck;
         for (uint8 suit = 0; suit < 4; suit++) {
             for (uint8 value = 0; value < 13; value++) {
-                deck.push(CardManagement.Card(CardManagement.Suit(suit), CardManagement.Value(value)));
+                deck.push(Card(Suit(suit), Value(value)));
             }
         }
         requestRandomNumber();
@@ -177,22 +146,6 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         emit CommunityCardsDealt(communityCards);
     }
 
-    // function getPlayerHand(address player) external view returns (CardManagement.Card[] memory) {
-    //     return playerHands[player];
-    // }
-
-    // function getCommunityCards() external view returns (CardManagement.Card[] memory) {
-    //     return communityCards;
-    // }
-
-    // function removeCardsFromDeck(uint256 count) internal {
-    //     CardManagement.Card[] memory remainingDeck = new CardManagement.Card[](deck.length - count);
-    //     for (uint256 i = 0; i < deck.length - count; i++) {
-    //         remainingDeck[i] = deck[i + count];
-    //     }
-    //     return remainingDeck;
-    // }
-
     function determineWinners() internal {
         address[] memory activePlayers = new address[](playersList.length);
         uint256[] memory handValues = new uint256[](playersList.length);
@@ -201,8 +154,8 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         for (uint256 i = 0; i < playersList.length; i++) {
             address player = playersList[i];
             if (players[player].isActive) {
-                CardManagement.Card[] memory playerCards = playerHands[player];
-                CardManagement.Card[] memory allCards = new CardManagement.Card[](playerCards.length + communityCards.length);
+                Card[] memory playerCards = playerHands[player];
+                Card[] memory allCards = new Card[](playerCards.length + communityCards.length);
                 
                 for (uint256 j = 0; j < playerCards.length; j++) {
                     allCards[j] = playerCards[j];

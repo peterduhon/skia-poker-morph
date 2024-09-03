@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./Common.sol";
 
 contract UserManagement is Ownable, AccessControl {
     bytes32 public constant GAME_CONTRACT_ROLE = keccak256("GAME_CONTRACT_ROLE");
-
-    struct User {
-        address userAddress;
-        string username;
-        uint256 balance;
-    }
 
     mapping(address => User) public users;
 
@@ -19,7 +14,7 @@ contract UserManagement is Ownable, AccessControl {
     event BalanceUpdated(address indexed user, uint256 newBalance);
 
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(GAME_CONTRACT_ROLE, msg.sender);
     }
 
     function registerUser(string calldata _username) external payable {
