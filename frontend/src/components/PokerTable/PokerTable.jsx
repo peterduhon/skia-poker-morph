@@ -2,19 +2,6 @@ import React from "react";
 import { motion } from "framer-motion";
 
 const PokerTable = () => {
-  const playerPositions = [
-    { angle: 90, label: "Player 1" },
-    { angle: 126, label: "Player 2" },
-    { angle: 162, label: "Player 3" },
-    { angle: 198, label: "Player 4" },
-    { angle: 234, label: "Player 5" },
-    { angle: 270, label: "Player 6" },
-    { angle: 306, label: "Player 7" },
-    { angle: 342, label: "Player 8" },
-    { angle: 18, label: "Player 9" },
-    { angle: 54, label: "Player 10" },
-  ];
-
   return (
     <div className="min-h-screen w-full bg-[#1C0F00] flex justify-center items-center p-4">
       <div className="relative w-full max-w-[800px] aspect-square">

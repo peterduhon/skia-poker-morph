@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -76,6 +76,10 @@ contract GameManagement is Ownable, AccessControl {
     handEvaluator.startGame(gameId, _buyInAmount, _maxPlayers);
     
     emit GameRoomCreated(gameId, msg.sender, _buyInAmount, _maxPlayers);
+}
+
+function endGame(address[] memory winners) public onlyOwner {
+    handEvaluator.endGame(winners);
 }
 
     /**

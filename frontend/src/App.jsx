@@ -1,7 +1,7 @@
-import PokerTable from "./components/PokerTable/PokerTable";
+import { GamePage } from "./pages/GamePage/GamePage";
 
 function App() {
-  return <PokerTable />;
+  return <GamePage />;
 }
 
 export default App;

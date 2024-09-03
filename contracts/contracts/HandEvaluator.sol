@@ -872,15 +872,11 @@ function initiateShowdown() internal {
     }
 
     function shuffleDeck(uint256 randomness) internal {
-    for (uint256 i = 51; i > 0; i--) {
+    for (uint256 i = deck.length - 1; i > 0; i--) {
         uint256 j = randomness % (i + 1);
-        assembly {
-            let ptr := deck.slot
-            let iValue := sload(add(ptr, i))
-            let jValue := sload(add(ptr, j))
-            sstore(add(ptr, i), jValue)
-            sstore(add(ptr, j), iValue)
-        }
+        uint256 temp = deck[i];
+        deck[i] = deck[j];
+        deck[j] = temp;
         randomness = uint256(keccak256(abi.encode(randomness)));
     }
 }
@@ -950,7 +946,7 @@ function initiateShowdown() internal {
         return winners;
     }
 
-    function countBestHandValue() public view returns (uint256){
+    function countBestHandValue() internal view returns (uint256){
       uint256 bestHandValue = 0;
         for (uint i = 0; i < playerAddresses.length; i++) {
             address player = playerAddresses[i];
@@ -972,7 +968,7 @@ function initiateShowdown() internal {
         return bestHandValue;
     }
 
-    function countWinners(uint bestHand)public view returns (uint256){
+    function countWinners(uint bestHand)internal view returns (uint256){
          uint256 winnerCount = 0;
          for (uint i = 0; i < playerAddresses.length; i++) {
             address player = playerAddresses[i];

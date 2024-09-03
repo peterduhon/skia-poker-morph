@@ -1,6 +1,10 @@
 .game {
   position: relative;
   background-image: url("/assets/table.svg");
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
   width: 1400px;
   height: 800px;
 
