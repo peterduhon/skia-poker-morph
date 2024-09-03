@@ -1,16 +1,7 @@
-import { Navigate, Routes, Route } from "react-router-dom";
-
-import { HomePage } from "./pages/HomePage/HomePage";
-import { GamePage } from "./pages/GamePage/GamePage";
+import PokerTable from "./components/PokerTable/PokerTable";
 
 function App() {
-  return (
-    <Routes>
-      <Route index element={<HomePage />} />
-      <Route path="game" element={<GamePage />} />
-      <Route path="/*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  return <PokerTable />;
 }
 
 export default App;
