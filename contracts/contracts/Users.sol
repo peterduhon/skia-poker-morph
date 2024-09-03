@@ -22,27 +22,20 @@ contract UserManagement is Ownable, AccessControl {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    /**
-     * @dev Registers a new user with an initial balance.
-     * @param _username The username of the user.
-     */
     function registerUser(string calldata _username) external payable {
         require(bytes(users[msg.sender].username).length == 0, "User already registered");
         require(msg.value > 0, "Initial balance must be greater than 0");
 
-        users[msg.sender].userAddress = msg.sender;
-        users[msg.sender].username = _username;
-        users[msg.sender].balance = msg.sender.balance;
+        users[msg.sender] = User({
+            userAddress: msg.sender,
+            username: _username,
+            balance: msg.value
+        });
 
         emit UserRegistered(msg.sender, _username);
-        emit BalanceUpdated(msg.sender, msg.sender.balance);
+        emit BalanceUpdated(msg.sender, msg.value);
     }
 
-    /**
-     * @dev Updates the balance of a user (can only be called by authorized entities).
-     * @param _user The address of the user.
-     * @param _amount The amount to add or subtract from the user's balance.
-     */
     function updateBalance(address _user, uint256 _amount) external onlyRole(GAME_CONTRACT_ROLE) {
         require(users[_user].balance + _amount >= users[_user].balance, "Overflow error");
         users[_user].balance += _amount;
@@ -50,10 +43,6 @@ contract UserManagement is Ownable, AccessControl {
         emit BalanceUpdated(_user, users[_user].balance);
     }
 
-    /**
-     * @dev Withdraws funds from the caller's account.
-     * @param _amount The amount to withdraw.
-     */
     function withdraw(uint256 _amount) external {
         require(users[msg.sender].balance >= _amount, "Insufficient balance");
         users[msg.sender].balance -= _amount;
@@ -62,21 +51,14 @@ contract UserManagement is Ownable, AccessControl {
         emit BalanceUpdated(msg.sender, users[msg.sender].balance);
     }
 
-    /**
-     * @dev Retrieves the profile of a user.
-     * @param _user The address of the user.
-     * @return username The username of the user.
-     * @return balance The balance of the user.
-     */
-    function getUserProfile(address _user) external view returns (string memory username, uint256 balance) {
-        User memory user = users[_user];
-        return (user.username, user.balance);
+    function getUserNickName(address _user) external view returns (string memory) {
+        return users[_user].username;
     }
 
-    /**
-     * @dev Grants GAME_CONTRACT_ROLE to an address.
-     * @param account The address to grant the role to.
-     */
+    function getUserBalance(address _user) external view returns (uint256) {
+        return users[_user].balance;
+    }
+
     function grantGameContractRole(address account) public onlyOwner {
         grantRole(GAME_CONTRACT_ROLE, account);
     }
