@@ -243,7 +243,7 @@ contract CardManagement is Ownable {
         for (uint256 i = 0; i < hand.length; i++) {
             values[uint256(hand[i].value)]++;
         }
-        for (uint256 i = 12 ; i >= 0 ; i-- )
+        for (uint256 i = hand.length -1 ; i >= 0 ; i-- )
             if(values[i] > 0) return i;
     }
 

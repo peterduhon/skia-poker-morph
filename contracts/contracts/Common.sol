@@ -1,5 +1,5 @@
+//SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
-
 // Enums
 enum Suit { Spades, Hearts, Diamonds, Clubs }
 enum Value { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace }

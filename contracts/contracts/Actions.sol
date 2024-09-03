@@ -102,7 +102,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
             uint256 j = randomResult % deckSize;
             Card memory temp = deck[i];
             deck[i] = deck[j];
-            deck[j] = deck[i];
+            deck[j] = temp;
         }
     }
 
@@ -130,7 +130,9 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
     function dealCardsToPlayers(address[] memory _players) internal onlyOwner {
         require(deck.length >= _players.length * 2, "Not enough cards in deck");
         for (uint256 i = 0; i < _players.length; i++) {
-            playerHands[_players[i]] = [deck[deck.length-1], deck[deck.length-2]];
+            Card[] storage playerHand = playerHands[_players[i]];
+            playerHand.push(deck[deck.length-1]);
+            playerHand.push(deck[deck.length-2]);
             deck.pop();
             deck.pop();
             emit CardsDealt(_players[i], playerHands[_players[i]]);
@@ -303,16 +305,6 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         dealCardsToPlayers(playersList);
 
         emit GameStateChanged(gameState);
-    }
-
-    function syncPlayerInfo() internal {
-        address[] memory playersInRoom = roomManagement.getPlayers(roomId);
-        for (uint256 i = 0; i < playersInRoom.length; i++) {
-            address player = playersInRoom[i];
-            (string memory nickName, uint256 chips) = roomManagement.getPlayerInfo(roomId, player);
-            players[player].balance = chips;
-            // Optionally, you can store nickName if needed in Actions.sol
-        }
     }
 
     function nextGameState() internal {
