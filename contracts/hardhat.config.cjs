@@ -1,12 +1,32 @@
 require("@nomicfoundation/hardhat-toolbox");
+require('dotenv').config()
 
-/** @type import('hardhat/config').HardhatUserConfig */
+const {API_URL, PRIVATE_KEY, PRIVATE_KEY_LOCAL} = process.env;
+
 module.exports = {
-  solidity: "0.8.19",
+  solidity: {
+    compilers: [{
+      version: '0.8.19',
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 500
+        }
+      }
+    }]
+  },
+
+  defaultNetwork: "holesky",
   networks: {
+    hardhat: {},
+    local: {
+      url: "http://127.0.0.1:8545/",
+      accounts: [PRIVATE_KEY_LOCAL],
+    },
     holesky: {
-      url: "https://rpc-quicknode-holesky.morphl2.io/", // Replace with the actual Morph RPC URL for Holesky
-      accounts: [process.env.PRIVATE_KEY], // Replace with your account's private key
+      url: API_URL,
+      accounts: [PRIVATE_KEY],
     },
   },
+
 };

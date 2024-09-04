@@ -18,7 +18,7 @@ contract UserManagement is Ownable, AccessControl {
     }
 
     function registerUser(string calldata _username) external payable {
-        require(bytes(users[msg.sender].username).length == 0, "User already registered");
+        // require(bytes(users[msg.sender].username).length == 0, "User already registered");
         require(msg.value > 0, "Initial balance must be greater than 0");
 
         users[msg.sender] = User({
