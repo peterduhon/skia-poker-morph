@@ -1,13 +1,21 @@
 import { GamePage } from "./pages/GamePage/GamePage";
-import { PokerTable } from "./components/PokerTable/PokerTable";
+import { LandingPage } from "./pages/LandingPage/LandingPage";
+import { GameModePage } from "./pages/GameModePage/GameModePage";
+import { WaitingRoomPage } from "./pages/WaitingRoomPage/WaitingRoomPage";
+
 import "./App.css";
+
+import { Routes, Route } from "react-router-dom";
 
 function App() {
   return (
     <div className="container">
-      <PokerTable>
-        <GamePage />
-      </PokerTable>
+      <Routes>
+        <Route path="" element={<LandingPage />} />
+        <Route path="mode" element={<GameModePage />} />
+        <Route path="wroom" element={<WaitingRoomPage />} />
+        <Route path="game" element={<GamePage />} />
+      </Routes>
     </div>
   );
 }
