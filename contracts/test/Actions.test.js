@@ -9,12 +9,12 @@ describe("BettingAndPotManagement Contract", function () {
         const roomManagement = await hre.ethers.deployContract("RoomManagement");
         const userManagement = await hre.ethers.deployContract("UserManagement");
         
-        const vrfCoordinator = "0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D";
-        const linkToken = "0x326C977E6efc84E512bB9C30f76E30c160eD06FB";
+        const vrfCoordinator = "0x6A2AAd07396B36Fe02a22b33cf443582f682c82f";
+        const linkToken = "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06";
         const keyHash = "0x6c3699283bda56ad74f6b855546325b68d482e983852a7a82979cc4807b641f4";
-        const fee = ethers.utils.parseEther("0.1");
+        const fee = ethers.parseEther("0.1");
 
-        const minimumBet = ethers.utils.parseEther("0.1");
+        const minimumBet = ethers.parseEther("0.005");
         const roomId = 1;
 
         const bettingAndPotManagement = await hre.ethers.deployContract(
@@ -40,11 +40,12 @@ describe("BettingAndPotManagement Contract", function () {
         
         await bettingAndPotManagement.initializeDeck();
 
-        const deckSize = bettingAndPotManagement.deck.length;
-        expect(deckSize).to.equal(52);
+        const deck = await bettingAndPotManagement.deck;
+        console.log("suffled deck : ", deck);
+        expect(deck.length).to.equal(52);
     });
 
-    it("Should allow players to join the game", async function () {
+    it("Should allow players to join the game", async function () {     //need to cooperate with RoomManagement registerPlayer
         const { bettingAndPotManagement, player1 } = await loadFixture(deployBettingAndPotManagement);
 
         await bettingAndPotManagement.connect(player1).joinGame();
@@ -76,7 +77,7 @@ describe("BettingAndPotManagement Contract", function () {
         await bettingAndPotManagement.startGame();
 
         // Player 1 raises
-        const raiseAmount = ethers.utils.parseEther("0.2");
+        const raiseAmount = ethers.parseEther("0.2");
         await bettingAndPotManagement.connect(player1).playerAction(PlayerAction.Raise, raiseAmount);
 
         // Player 2 calls
@@ -145,7 +146,7 @@ describe("BettingAndPotManagement Contract", function () {
         await bettingAndPotManagement.playerAction(PlayerAction.Check, 0);
         await bettingAndPotManagement.nextGameState(); // Move to Showdown
 
-        const potAmount = ethers.utils.parseEther("0.4"); // Example pot amount
+        const potAmount = ethers.parseEther("0.4"); // Example pot amount
 
         // Distribute pot to player1 (winner)
         await bettingAndPotManagement.distributePots();

@@ -71,11 +71,13 @@ contract CardManagement is Ownable {
     function isRoyalFlush(Card[] memory hand) internal pure returns (bool) {
         uint8[13] memory values;
         uint8[4] memory suits;
+        bool suit_flag = false;
         for (uint i = 0; i < hand.length; i++) {
             suits[uint8(hand[i].suit)]++;
+            if(suits[uint8(hand[i].suit)] == 5) suit_flag = true;
             values[uint8(hand[i].value)]++;
         }
-        return (suits[0] >= 5 && values[9] == 1 && values[10] == 1 && values[11] == 1 && values[12] == 1);
+        return (suit_flag && values[8] > 0 && values[9] > 0 && values[10] > 0 && values[11] > 0 && values[12] > 0);
     }
 
     function countValueOccurrences(Card[] memory hand, uint8 occurrence) internal pure returns (uint8) {
@@ -127,9 +129,9 @@ contract CardManagement is Ownable {
         }
         for (uint256 i = 0; i < 13; i++) {
             if (values[i] == 3) {
-                threeOfAKindValue = i;
+                threeOfAKindValue = i + 1;
             } else if (values[i] == 2) {
-                pairValue = i;
+                pairValue = i + 1;
             }
         }
         if (threeOfAKindValue != 0 && pairValue != 0) {
@@ -163,12 +165,12 @@ contract CardManagement is Ownable {
         }
 
         // Find the two pairs
-        for (uint256 i = 0; i < 13; i++) {
+        for (uint256 i = 12; i >= 0; i--) {
             if (values[i] == 2) {
                 if (firstPair == 0) {
-                    firstPair = i;
+                    firstPair = i + 1;
                 } else {
-                    secondPair = i;
+                    secondPair = i + 1;
                     break;
                 }
             }
@@ -176,11 +178,7 @@ contract CardManagement is Ownable {
 
         // If we have two pairs
         if (firstPair != 0 && secondPair != 0) {
-            // Ensure that pairs are ordered from highest to lowest
-            if (firstPair < secondPair) {
-                (firstPair, secondPair) = (secondPair, firstPair);
-            }
-
+            
             // Find the kicker (the card not part of any pair)
             for (uint256 i = 0; i < hand.length; i++) {
                 if (uint256(hand[i].value) != firstPair && uint256(hand[i].value) != secondPair) {
@@ -243,7 +241,7 @@ contract CardManagement is Ownable {
         for (uint256 i = 0; i < hand.length; i++) {
             values[uint256(hand[i].value)]++;
         }
-        for (uint256 i = hand.length -1 ; i >= 0 ; i-- )
+        for (uint256 i = 12 ; i >= 0 ; i-- )
             if(values[i] > 0) return i;
     }
 

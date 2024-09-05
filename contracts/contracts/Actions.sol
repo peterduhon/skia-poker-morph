@@ -17,6 +17,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
     uint256 public currentPlayerIndex;
 
     address[] public playersList;
+    address[] public leavePlayersList;
     mapping(address => Player) public players;
     mapping(address => Card[]) public playerHands;
     Card[] public communityCards;
@@ -39,6 +40,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
     event GameStateChanged(GameState newState);
     event PlayerJoined(address player);
     event PlayerLeft(address player);
+    event PlayersLeft(address[] players);
     event PlayerActionTaken(address player, PlayerAction action, uint256 amount);
     event PotCreated(uint256 potIndex, uint256 amount, address[] eligiblePlayers);
     event PotDistributed(uint256 potIndex, uint256 amount, address[] winners);
@@ -48,6 +50,8 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
     event CardsDealt(address indexed player, Card[] hand);
     event CommunityCardsDealt(Card[] communityCards);
     event DeckReset();
+    event PlayersInfoUpdated();
+    event PlayerListSyncFinished();
 
     modifier inGameState(GameState _state) {
         require(gameState == _state, "Invalid game state for this action");
@@ -216,12 +220,12 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
             player.action = PlayerAction.Check;
         } else if (action == PlayerAction.Call) {
             uint256 callAmount = currentBet - player.currentBet;
-            require(player.balance >= callAmount, "Insufficient balance to call");
+            require(player.balance >= callAmount, "Poler Game : Insufficient balance to call");
             player.balance -= callAmount;
             player.currentBet = currentBet;
             player.action = PlayerAction.Call;
         } else if (action == PlayerAction.Bet || action == PlayerAction.Raise) {
-            require(player.balance >= amount, "Insufficient balance to bet/raise");
+            require(player.balance >= amount, "Poker Game : Insufficient balance to bet/raise");
             if (action == PlayerAction.Raise) {
                 currentBet += amount;
             }
@@ -256,7 +260,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
     }
 
     function initializePots() internal {
-        pots.push();
+        delete pots;
     }
 
     function createPot(uint256 amount, address[] memory eligiblePlayers) internal {
@@ -268,7 +272,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         emit PotCreated(pots.length - 1, amount, eligiblePlayers);
     }
 
-    function distributePots() internal {
+    function distributePots() internal {        //need to fix
         for (uint256 i = 0; i < pots.length; i++) {
             Pot storage pot = pots[i];
             uint256 share = pot.amount / pot.eligiblePlayers.length;
@@ -321,11 +325,78 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
             gameState = GameState.Showdown;
             determineWinners();
             gameState = GameState.Finished;
+            updatePlayersInfo();
+            
+            bool updateAvailable = roomManagement.isUpdateAvailable(roomId);
+            if(updateAvailable) syncPlayers();
         } else {
             revert("Invalid game state transition");
         }
 
         resetBettingRound();
         emit GameStateChanged(gameState);
+    }
+
+    function leaveGame() external {
+        require(players[msg.sender].addr == msg.sender, "Poker Game : Player is not in the game");
+        if(gameState == GameState.WaitingForPlayers) {
+            roomManagement.removePlayer(roomId, msg.sender);
+            userManagement.updateBalance(msg.sender, players[msg.sender].balance);
+            emit PlayerLeft(msg.sender);
+        }
+        else {
+            leavePlayersList.push(msg.sender);
+        }
+    }
+
+    function getLeavePlayersList() external view returns (address[] memory) {
+        return leavePlayersList;
+    }
+
+    function syncPlayers() internal {
+        delete playersList;
+        address[] memory _playerAddresses = roomManagement.getPlayers(roomId);
+        for(uint i = 0; i < _playerAddresses.length; i++)
+        {
+            (string memory nickname, uint256 balance) = roomManagement.getPlayerInfo(roomId, _playerAddresses[i]);
+            Player memory _newPlayer = Player(
+                _playerAddresses[i],
+                nickname,
+                balance,
+                0,
+                PlayerAction.None,
+                true,
+                false
+            );
+            players[_playerAddresses[i]] = _newPlayer;
+            playersList.push(_playerAddresses[i]);
+        }
+        emit PlayerListSyncFinished();
+    }
+
+    function updatePlayersInfo() internal {
+        for(uint256 i = 0; i < leavePlayersList.length; i++) {
+            for(uint256 j = 0; j < playersList.length; j++) {
+                if(playersList[j] == leavePlayersList[i]) {
+                    playersList[j] = playersList[playersList.length - 1];
+                    playersList.pop();
+                    roomManagement.removePlayer(roomId, leavePlayersList[i]);
+                }
+            }
+            userManagement.updateBalance(leavePlayersList[i], players[leavePlayersList[i]].balance);
+        }
+        emit PlayersLeft(leavePlayersList);
+        delete leavePlayersList;
+
+        for(uint256 i = 0; i < playersList.length; i++)
+        {
+            roomManagement.updatePlayerInfo(
+                roomId, 
+                playersList[i], 
+                players[playersList[i]].nickname,
+                players[playersList[i]].balance
+            );
+        }
+        emit PlayersInfoUpdated();
     }
 }

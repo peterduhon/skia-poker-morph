@@ -44,6 +44,7 @@ struct Card {
 
 struct Player {
     address addr; // Renamed to avoid confusion with PlayerInfo
+    string nickname;
     uint256 balance; // You may want to consider using 'chips' for clarity across structs
     uint256 currentBet;
     PlayerAction action; // You may want to consider renaming to 'status' for consistency
@@ -58,6 +59,7 @@ struct Pot {
 
 struct GameRoom {
     uint256 id;
+    string title;
     address creator;
     uint256 buyInAmount;
     uint256 maxPlayers;
@@ -66,6 +68,7 @@ struct GameRoom {
 }
 
 struct Room {
+    string title;
     uint256 id;
     uint256 buyInAmount;
     mapping(address => PlayerInfo) playerInfos;
@@ -81,4 +84,7 @@ struct User {
     address userAddress;
     string username;
     uint256 balance;
+    bool isRegistered;
+    uint256 roomID;
+    bool isJoined;
 }
