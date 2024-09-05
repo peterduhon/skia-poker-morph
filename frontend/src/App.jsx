@@ -2,6 +2,7 @@ import { GamePage } from "./pages/GamePage/GamePage";
 import { LandingPage } from "./pages/LandingPage/LandingPage";
 import { GameModePage } from "./pages/GameModePage/GameModePage";
 import { WaitingRoomPage } from "./pages/WaitingRoomPage/WaitingRoomPage";
+import { AuthPage } from "./pages/AuthPage/AuthPage";
 
 import "./App.css";
 
@@ -12,6 +13,7 @@ function App() {
     <div className="container">
       <Routes>
         <Route path="" element={<LandingPage />} />
+        <Route path="auth" element={<AuthPage />} />
         <Route path="mode" element={<GameModePage />} />
         <Route path="wroom" element={<WaitingRoomPage />} />
         <Route path="game" element={<GamePage />} />
