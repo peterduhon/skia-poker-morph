@@ -435,6 +435,19 @@
     "inputs": [
       {
         "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "userLeftRoom",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "",
         "type": "address"
       }
