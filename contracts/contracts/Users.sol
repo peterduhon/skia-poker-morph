@@ -42,6 +42,10 @@ contract UserManagement is Ownable, AccessControl {
         }
     }
 
+    function userLeftRoom(address _user) external {
+        users[_user].isJoined = false;
+    }
+
     function addressToString(address _addr) internal pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(_addr)));
         bytes memory alphabet = "0123456789abcdef";

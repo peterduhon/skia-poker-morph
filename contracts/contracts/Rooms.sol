@@ -88,6 +88,12 @@ contract RoomManagement is Ownable {
         emit PlayerInfoUpdated(roomId, player, nickName, chips);
     }
 
+    function updatePlayersList(uint256 roomId, address[] memory _playersList) external {
+        Room storage room = rooms[roomId];
+        delete room.players;
+        for(uint i = _playersList.length -1; i >= 0; i--) room.players.push(_playersList[i]);
+    }
+
     function removePlayer(uint256 roomId, address player) external onlyOwner {
         Room storage room = rooms[roomId];
         for (uint256 i = 0; i < room.players.length; i++) {

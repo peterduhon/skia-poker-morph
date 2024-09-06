@@ -19,8 +19,7 @@ enum PlayerAction {
     Call,
     Bet,
     Raise,
-    AllIn,
-    Begin // Added 'Begin' to combine with previous definition
+    AllIn
 }
 enum HandRanking {
     HighCard,
@@ -43,11 +42,11 @@ struct Card {
 }
 
 struct Player {
-    address addr; // Renamed to avoid confusion with PlayerInfo
+    address addr;
     string nickname;
-    uint256 balance; // You may want to consider using 'chips' for clarity across structs
+    uint256 balance;
     uint256 currentBet;
-    PlayerAction action; // You may want to consider renaming to 'status' for consistency
+    PlayerAction action;
     bool isActive;
     bool hasActed;
 }

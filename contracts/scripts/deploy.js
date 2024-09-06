@@ -3,18 +3,18 @@ const { ethers } = require("hardhat");
 
 async function main() {
     // Get the contract factories
-    const GameManagement = await ethers.getContractFactory("GameManagement");
     const RoomManagement = await ethers.getContractFactory("RoomManagement");
     const UserManagement = await ethers.getContractFactory("UserManagement");
     const BettingAndPotManagement = await ethers.getContractFactory("BettingAndPotManagement");
     const CardManagement = await ethers.getContractFactory("CardManagement");
     const PokerGameProxy = await ethers.getContractFactory("SkiaPokerProxy");
+    const AIPlayerManagement = await ethers.getContractFactory("AIPlayerManagement");
   
-    // Deploy the contracts
-    const gameManagement = await GameManagement.deploy();
-    await gameManagement.waitForDeployment();
-    console.log("GameManagement deployed to:", gameManagement.target);
-  
+    // // Deploy the contracts
+    const aiPlayerManagement = await AIPlayerManagement.deploy();
+    await aiPlayerManagement.waitForDeployment();
+    console.log("AIPlayerManagement deployed to:", aiPlayerManagement.target);
+
     const roomManagement = await RoomManagement.deploy();
     await roomManagement.waitForDeployment();
     console.log("RoomManagement deployed to:", roomManagement.target);
@@ -29,9 +29,11 @@ async function main() {
 
     const bettingAndPotManagement = await BettingAndPotManagement.deploy(
       0,
+      "0x3DcD01c4AeEB6a13c106989db3934132dF74Cc8c",
       cardManagement.target,
       roomManagement.target,
       userManagement.target,
+      aiPlayerManagement.target,
       ethers.parseEther("0.1"),
       "0x6A2AAd07396B36Fe02a22b33cf443582f682c82f",
       "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
@@ -42,7 +44,7 @@ async function main() {
     console.log("BettingAndPotManagement deployed to:", bettingAndPotManagement.target);
     
     // Deploy the proxy contract, pointing it to the implementation contract
-    const proxy = await PokerGameProxy.deploy(gameManagement.target);
+    const proxy = await PokerGameProxy.deploy(roomManagement.target);
     await proxy.waitForDeployment();
     console.log("PokerGameProxy deployed to:", proxy.target);
   
