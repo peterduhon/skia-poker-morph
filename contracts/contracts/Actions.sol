@@ -446,7 +446,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         emit GameStateChanged(gameState);
     }
 
-    function endGame() internal onlyOwner payable {
+    function endGame() public onlyOwner payable {
         require(playersList.length > 0, "No players in the game");
         address winner = playersList[0];
         uint256 amount = players[winner].balance;
