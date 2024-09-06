@@ -312,7 +312,7 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
 
         // If there's remaining pot, re-run the function to handle side pots
         if (totalPot > 0) determineWinners(totalPot);
-        else emit GameEnded();
+        else emit RoundEnded();
     }
 
     function resetBettingRound() internal {
@@ -436,9 +436,8 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
             gameState = GameState.Finished;
             bool updateAvailable = roomManagement.isUpdateAvailable(roomId);
             if(updateAvailable) syncPlayers();
-
             updatePlayersInfo();
-            
+            if(playersList.length == 1) endGame();
         } else {
             revert("Invalid game state transition");
         }
@@ -446,6 +445,21 @@ contract BettingAndPotManagement is Ownable, ReentrancyGuard, VRFConsumerBase {
         resetBettingRound();
         emit GameStateChanged(gameState);
     }
+
+    function endGame() internal onlyOwner payable {
+        require(playersList.length > 0, "No players in the game");
+        address winner = playersList[0];
+        uint256 amount = players[winner].balance;
+
+        // Ensure the contract has enough Ether to send
+        require(address(this).balance >= amount, "Insufficient balance in contract");
+
+        // Use call instead of transfer for better gas forwarding
+        (bool success, ) = payable(winner).call{value: amount}("");
+        require(success, "Transfer failed");
+        roomManagement.updateGameStatus(roomId, GameStatus.Completed);
+    }
+
 
     function leaveGame() external {
         require(players[msg.sender].addr == msg.sender, "Poker Game : Player is not in the game");
