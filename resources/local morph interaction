@@ -1,0 +1,69 @@
+# Interacting with Morph Blockchain Locally
+
+This guide will help you set up and interact with the Morph blockchain from your local development environment.
+
+## Setup
+
+1. Install required dependencies:
+   ```
+   npm install ethers
+   ```
+
+2. Create a new file (e.g., `morphInteraction.js`) and add the following code:
+
+```javascript
+const ethers = require('ethers');
+
+// Morph testnet RPC URL
+const rpcUrl = 'https://rpc-testnet.morphl2.io';
+
+// Create a provider
+const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+
+// Function to create a contract instance
+function getContract(address, abi, signer) {
+  return new ethers.Contract(address, abi, signer);
+}
+
+// Example function to interact with a contract
+async function interactWithContract(contractAddress, contractABI) {
+  // Create a wallet instance (replace with your own private key)
+  const privateKey = 'your_private_key_here';
+  const wallet = new ethers.Wallet(privateKey, provider);
+
+  // Get the contract instance
+  const contract = getContract(contractAddress, contractABI, wallet);
+
+  // Example: Call a read function
+  const result = await contract.someReadFunction();
+  console.log('Read result:', result);
+
+  // Example: Call a write function
+  const tx = await contract.someWriteFunction(param1, param2);
+  await tx.wait();
+  console.log('Transaction completed');
+}
+
+// Usage
+const contractAddress = 'your_contract_address_here';
+const contractABI = []; // Paste your contract ABI here
+
+interactWithContract(contractAddress, contractABI)
+  .then(() => console.log('Interaction completed'))
+  .catch(error => console.error('Error:', error));
+```
+
+3. Replace `'your_private_key_here'`, `'your_contract_address_here'`, and the empty ABI array with your actual data.
+
+4. Run the script:
+   ```
+   node morphInteraction.js
+   ```
+
+## Notes
+
+- Always keep your private keys secure and never commit them to version control.
+- For frontend integration, you'll use a similar setup, but you'll get the signer from Web3Auth instead of hardcoding a private key.
+- Make sure you have test ETH in your account on the Morph testnet to pay for gas fees.
+
+This setup allows you to interact with your deployed contracts on the Morph testnet from your local machine, without needing a deployed frontend.
