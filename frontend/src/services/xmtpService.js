@@ -1,32 +1,44 @@
 import { Client } from "@xmtp/xmtp-js";
-import { ethers } from "ethers";
+import Web3 from "web3";
 
 let xmtp;
-let conversations = new Map();
 
-export const initializeXMTP = async (signer) => {
-  xmtp = await Client.create(signer, { env: "production" });
-  return xmtp;
-};
+export const initializeXMTP = async (provider) => {
+  try {
+    console.log("Initializing XMTP with Web3Auth provider...");
+    const web3 = new Web3(provider);
+    const accounts = await web3.eth.getAccounts();
+    console.log("Signer account:", accounts[0]);
 
-export const startConversation = async (peerAddress) => {
-  if (!xmtp) throw new Error("XMTP client not initialized");
-  const conversation = await xmtp.conversations.newConversation(peerAddress);
-  conversations.set(peerAddress, conversation);
-  return conversation;
+    const signer = {
+      getAddress: async () => accounts[0],
+      signMessage: async (message) => {
+        console.log("Signing message:", message);
+        const signature = await web3.eth.personal.sign(message, accounts[0]);
+        console.log("Generated signature:", signature);
+        return signature;
+      },
+    };
+
+    console.log("Creating XMTP client...");
+    const client = await Client.create(signer, { env: "production" });
+    console.log("XMTP client created successfully");
+    return client;
+  } catch (error) {
+    console.error("XMTP Client creation failed", error);
+    throw error;
+  }
 };
 
 export const sendMessage = async (peerAddress, message) => {
-  const conversation =
-    conversations.get(peerAddress) || (await startConversation(peerAddress));
+  if (!xmtp) throw new Error("XMTP client not initialized");
+  const conversation = await xmtp.conversations.newConversation(peerAddress);
   await conversation.send(message);
 };
 
-export const listenForMessages = (peerAddress, callback) => {
-  const conversation = conversations.get(peerAddress);
-  if (!conversation) throw new Error("Conversation not found");
-
-  const stream = conversation.streamMessages();
+export const listenForMessages = (callback) => {
+  if (!xmtp) throw new Error("XMTP client not initialized");
+  const stream = xmtp.conversations.streamAllMessages();
   stream.on("message", callback);
-  return () => stream.return(); // Call this function to stop listening
+  return () => stream.removeListener("message", callback);
 };

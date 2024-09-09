@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
 import "./game.scss";
 import { Player } from "../../components/Player/Player";
 import { CommunityCards } from "../../components/CommunityCards/CommunityCard";
+import UserManagementABI from "../../contracts/UserManagement.json";
+import Web3 from "web3";
 
 /* //frontend listen to players, currentPlayer, phase, communityCards */
 let phase = "pre-flop";
@@ -16,145 +17,53 @@ const users = [
 
 const communityCards = ["gh", "fg", "jk", "hj", "hj"];
 
+/* const web3 = new Web3("https://rpc.ankr.com/eth_holesky");
+const contractUserAddress = "0x8EE046ef044C7fd8D41777259024f6d52Ba1d5b4";
+const userManagement = new web3.eth.Contract(
+  UserManagementABI,
+  contractUserAddress
+); */
+/* userManagement.methods     ///already tested
+  .isUserRegistered("0xC85eCEAbf9A7c78C4F0D8Dfca2A84BA661bcB84F")
+  .call()
+  .then(console.log); */
+
+/* userManagement.methods // call smart contract to register user
+  .registerUser("Mark")
+  .send({
+    from: "0x98cD47bE93b3c28fD436d000FED9B9935b00660F",
+    value: web3.utils.toWei("0.1", "ether"),
+  }); */
+
+//call function that change state
+/*  await userManagement.methods // call smart contract to register user
+        .registerUser("Mark")
+        .send({ from: userAddress, value: web3.utils.toWei("0.1", "ether") }); */
+
+// listen to events
+/* await userManagement.events // call smart contract to register user
+  .UserRegistered({}, (error, event) => {
+    if (error) {
+      console.error("user event Error:", error);
+      return;
+    }
+
+    console.log("New event received:");
+    console.log(event.returnValues);
+  })
+  .on("connected", () => {
+    console.log("Connected to the blockchain");
+  })
+  .on("changed", (event) => {
+    console.log("Event changed:", event.returnValues);
+  })
+  .on("error", (error) => {
+    console.error("Event error:", error);
+  }); */
+
 export const Game = () => {
-  const [walletAddress, setWallet] = useState("");
-  const [status, setStatus] = useState("");
-
-  useEffect(() => {
-    //TODO: implement
-    initialWallet();
-  }, []);
-
-  async function initialWallet() {
-    const { address, status } = await getCurrentWalletConnected();
-
-    setWallet(address);
-    setStatus(status);
-
-    addWalletListener();
-  }
-
-  function addWalletListener() {
-    if (window.ethereum) {
-      window.ethereum.on("accountsChanged", (accounts) => {
-        if (accounts.length > 0) {
-          setWallet(accounts[0]);
-          setStatus("👆🏽 Write a message in the text-field above.");
-        } else {
-          setWallet("");
-          setStatus("🦊 Connect to Metamask using the top right button.");
-        }
-      });
-    } else {
-      setStatus(
-        <p>
-          {" "}
-          🦊{" "}
-          <a target="_blank" href={`https://metamask.io/download.html`}>
-            You must install Metamask, a virtual Ethereum wallet, in your
-            browser.
-          </a>
-        </p>
-      );
-    }
-  }
-
-  const getCurrentWalletConnected = async () => {
-    if (window.ethereum) {
-      try {
-        const addressArray = await window.ethereum.request({
-          method: "eth_accounts",
-        });
-        if (addressArray.length > 0) {
-          return {
-            address: addressArray[0],
-            status: "👆🏽 Write a message in the text-field above.",
-          };
-        } else {
-          return {
-            address: "",
-            status: "🦊 Connect to Metamask using the top right button.",
-          };
-        }
-      } catch (err) {
-        return {
-          address: "",
-          status: "😥 " + err.message,
-        };
-      }
-    } else {
-      return {
-        address: "",
-        status: (
-          <span>
-            <p>
-              {" "}
-              🦊{" "}
-              <a target="_blank" href={`https://metamask.io/download.html`}>
-                You must install Metamask, a virtual Ethereum wallet, in your
-                browser.
-              </a>
-            </p>
-          </span>
-        ),
-      };
-    }
-  };
-
-  const connectWalletPressed = async () => {
-    const walletResponse = await connectWallet();
-    setStatus(walletResponse.status);
-    setWallet(walletResponse.address);
-  };
-
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        const addressArray = await window.ethereum.request({
-          method: "eth_requestAccounts",
-        });
-        const obj = {
-          status: "👆🏽 Write a message in the text-field above.",
-          address: addressArray[0],
-        };
-        return obj;
-      } catch (err) {
-        return {
-          address: "",
-          status: "😥 " + err.message,
-        };
-      }
-    } else {
-      return {
-        address: "",
-        status: (
-          <span>
-            <p>
-              {" "}
-              🦊{" "}
-              <a target="_blank" href={`https://metamask.io/download.html`}>
-                You must install Metamask, a virtual Ethereum wallet, in your
-                browser.
-              </a>
-            </p>
-          </span>
-        ),
-      };
-    }
-  };
-
   return (
     <>
-      <button id="walletButton" onClick={connectWalletPressed}>
-        {walletAddress.length > 0 ? (
-          "Connected: " +
-          String(walletAddress).substring(0, 6) +
-          "..." +
-          String(walletAddress).substring(38)
-        ) : (
-          <span>Connect Wallet</span>
-        )}
-      </button>
       <div
         style={{
           gridColumn: 2,
