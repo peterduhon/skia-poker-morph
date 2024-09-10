@@ -1,0 +1,51 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "handStrength",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "potSize",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "position",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "currentBet",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "playerBalance",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum PlayerAction[]",
+        "name": "opponentHistory",
+        "type": "uint8[]"
+      }
+    ],
+    "name": "decideBettingAction",
+    "outputs": [
+      {
+        "internalType": "enum PlayerAction",
+        "name": "",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

@@ -1,0 +1,163 @@
+# Skia Poker MVP Features & Detailed UI Integration - Trustless Tricksters
+
+**Date:** August 31, 2024
+
+**Prepared by:** Trustless Tricksters Team
+
+## 1. Introduction
+
+### Objective
+This document outlines the core MVP features and detailed UI integration tasks for the Skia Poker project, tailored for the Trustless Tricksters team participating in the current hackathon. Our focus is on delivering a functional, visually cohesive poker game on the blockchain within the hackathon timeline, with deployment to the Morph testnet and Galadriel devnet.
+
+### Scope
+- Core MVP Features
+- Detailed UI Integration
+- Integration with Blockchain and Web3 Tools
+- Core Reusable Components
+- Post-Hackathon Considerations
+
+## 2. Core MVP Features
+
+### 2.1. Blockchain Integration
+- **Network Deployment**: 
+  - Deploy the Skia Poker MVP to the Morph testnet and Galadriel devnet.
+  - **Tasks**:
+    - Set up smart contracts for game logic on Morph testnet (Pete & James).
+    - Deploy the AI agent and the chain logic to Galadriel devnet (Fakename).
+  
+- **Smart Contract Essentials**:
+  - **Game Logic**: Ensure that the smart contracts cover the basic game rules, including betting, card dealing, hand evaluation, and payout distribution (James).
+  - **Chainlink VRF**: Implement Chainlink's Verifiable Random Function (VRF) to ensure randomness in card dealing and game outcomes (Tetiana).
+  - **Signing In**: Integrate Web3Auth for seamless user authentication, allowing players to connect using their Web3 wallets (Fakename).
+  
+### 2.2. Core Game Mechanics
+- **Gameplay Loop**:
+  - **Card Dealing**: Use Chainlink VRF to shuffle and deal cards, ensuring fair and unpredictable outcomes (Tetiana).
+  - **Betting Rounds**: Implement the basic betting structure, including pre-flop, flop, turn, and river rounds (James).
+  - **Hand Evaluation**: Ensure that the smart contracts accurately evaluate poker hands and determine the winner (Tetiana).
+  - **Payout Distribution**: Distribute winnings based on the hand evaluation results, with smart contracts handling the distribution of tokens (James).
+
+- **AI Integration**:
+  - **Basic AI Logic**: Implement a basic version of the AI opponent in JavaScript, with decision-making based on preset rules and randomness introduced via Chainlink VRF (Fakename - Spike SP-18).
+  - **AI Interactions**: Ensure that the AI interacts with the game environment, making decisions like betting, folding, or raising during gameplay (James & Fakename).
+
+### 2.3. UI/UX Elements
+- **Core Interface**:
+  - **Game Table**: Implement the poker table interface, including player seats, card display areas, and the betting area (Buddyharshal).
+  - **Player Avatars**: Display player avatars with basic customization options, including shadowy figures and basic glitch effects (Buddyharshal).
+  - **Card Designs**: Integrate the finalized card designs, ensuring they display correctly during gameplay, with front and back variations as per the design guidance document (Buddyharshal).
+
+- **Pregame Messaging**:
+  - **XMTP Integration**: Implement pregame messaging using XMTP, allowing players to communicate before the game starts (Fakename).
+  - **Messaging UI**: Create a simple messaging interface within the game lobby, enabling players to send and receive messages seamlessly (Buddyharshal & Fakename).
+
+- **Basic Navigation**:
+  - **Main Menu**: Implement a straightforward main menu with options to start a game, view the player's profile, or access settings (Buddyharshal).
+  - **Lobby**: Design and integrate the game lobby where players can see available tables, join a game, or create a new game (Buddyharshal).
+
+## 3. Detailed UI Integration
+
+### 3.1. UI Component Integration
+- **Button Integration**:
+  - Use standardized buttons across the interface, ensuring they adhere to the design guidelines for primary and secondary actions (Buddyharshal).
+  - Implement hover states and click feedback for all interactive elements (Buddyharshal).
+
+- **Card and Chip Display**:
+  - Integrate the card and chip designs, ensuring they are displayed correctly during gameplay. Use the design guidelines to maintain visual consistency (Buddyharshal).
+
+- **Avatar Placement**:
+  - Place player avatars around the poker table, ensuring they are correctly aligned and update dynamically as players join or leave the game (Buddyharshal).
+
+### 3.2. Web3 Integration
+- **Web3Auth**:
+  - Implement Web3Auth for user authentication, allowing players to log in using their Web3 wallets. Ensure the integration is smooth and secure (Fakename).
+
+- **Chainlink VRF**:
+  - Integrate Chainlink VRF for randomness in card shuffling and dealing. Test the VRF implementation to ensure it works seamlessly with the smart contracts (Fakename & Tetiana).
+
+### 3.3. Responsiveness and Compatibility
+- **Responsive Design**:
+  - Ensure the UI is responsive and works across different devices and screen sizes. Prioritize a mobile-first design, considering the hackathon timeframe (Buddyharshal).
+  
+- **Cross-Browser Testing**:
+  - Test the interface across different browsers to ensure consistent behavior and appearance (All team members).
+
+## 4. Hackathon-Specific Goals
+
+### 4.1. Morph Testnet Integration
+- Research LINK token and VRF coordinator availability on Morph testnet (Fakename - Spike SP-20)
+- Implement and test smart contracts on Morph testnet (James & Tetiana)
+
+### 4.2. Galadriel Devnet Integration
+- Verify Chainlink VRF compatibility on Galadriel devnet (Fakename - Spike SP-21)
+- Deploy and test AI agent on Galadriel devnet (Fakename)
+
+### 4.3. Demo Preparation
+- Create a compelling demo script showcasing key features (Pete)
+- Prepare visual aids and presentation materials (Buddyharshal)
+- Practice demo run-throughs (All team members)
+
+## 5. Core Reusable Components
+
+### 5.1. Smart Contract Components
+- **PlayerManagement**: Reusable player registration and management (James)
+- **GameLogic**: Core game rules and flow, adaptable for different poker variants (James)
+- **CardManagement**: Reusable card shuffling and dealing logic (Tetiana)
+
+### 5.2. UI Components
+- **Card Component**: Reusable card display with front and back views (Buddyharshal)
+- **Player Avatar**: Customizable player representation (Buddyharshal)
+- **Betting Interface**: Reusable betting controls (Buddyharshal)
+
+### 5.3. Blockchain Integration Components
+- **Web3Auth Wrapper**: Reusable authentication component (Fakename)
+- **Chainlink VRF Integration**: Modular randomness generation (Tetiana & Fakename)
+
+### 5.4. AI Components
+- **AI Decision Module**: Reusable decision-making logic for AI opponents (Fakename)
+- **AI-Contract Interface**: Standardized interface for AI interactions with smart contracts (James & Fakename)
+
+## 6. Post-Hackathon Considerations
+
+### 6.1. Advanced AI Development
+- **Improved AI Logic**: Post-hackathon, focus on enhancing the AI opponent with more sophisticated decision-making algorithms.
+- **Learning Mechanism**: Implement a learning mechanism where the AI adapts its strategy based on player behavior.
+
+### 6.2. Animation and Visual Effects
+- **Post-Hackathon Implementation**: Integrate subtle animations and glitch effects post-hackathon, using tools like Framer Motion or GreenSock Animation Platform (GSAP).
+- **Interactive Feedback**: Enhance the user experience with visual feedback for interactions, making the game more immersive.
+- **Card Animations**: Implement smooth animations for card dealing, flipping, and revealing.
+- **Chip Animations**: Add realistic animations for chip movements during betting and pot collection.
+
+### 6.3. Additional Game Features
+- **Multiplayer Support**: Expand the game to support more players per table, with enhanced player interactions.
+- **Tournament Mode**: Introduce a tournament mode with multiple rounds and escalating stakes.
+- **Leaderboards**: Implement a global leaderboard system to track player rankings and achievements.
+- **Spectator Mode**: Allow users to watch ongoing games without participating, potentially with delayed viewing for high-stakes games.
+
+### 6.4. Enhanced Security Measures
+- **Multi-Factor Authentication**: Implement additional security layers for user accounts.
+- **Fraud Detection**: Develop advanced algorithms to detect and prevent cheating or collusion.
+- **Regular Security Audits**: Schedule periodic security audits of smart contracts and the overall system.
+
+### 6.5. Community and Social Features
+- **In-Game Chat**: Expand on the XMTP integration to include in-game chat functionality.
+- **Friend System**: Implement a friend list and invite system for players.
+- **Achievements**: Create an achievement system to reward players for various accomplishments.
+
+## 7. Conclusion
+
+This comprehensive document serves as the foundational guide and roadmap for implementing the Skia Poker MVP, tailored specifically for the Trustless Tricksters team during the hackathon. By focusing on the core features, detailed UI integration, and reusable components outlined above, the team can deliver a polished and functional poker game on the blockchain within the hackathon timeframe.
+
+The post-hackathon considerations provide a clear path for future development, ensuring that Skia Poker has the potential to evolve into a fully-featured, competitive product in the blockchain gaming space.
+
+### Next Steps
+1. Finalize task assignments and set concrete deadlines for each team member.
+2. Establish a daily check-in routine to track progress and address any blockers promptly.
+3. Prioritize the development of core gameplay mechanics and blockchain integration.
+4. Begin work on reusable components to ensure efficient development and future scalability.
+5. Prepare for the demo day by creating a compelling presentation that showcases both the current MVP features and the vision for future enhancements.
+6. Conduct regular code reviews and integration tests to ensure all components work seamlessly together.
+7. Document all processes, decisions, and implementations to facilitate knowledge sharing and future development.
+
+By adhering to this plan and leveraging the diverse skills of the Trustless Tricksters team, we aim to create a standout project that not only meets the hackathon requirements but also lays a solid foundation for a revolutionary blockchain-based poker platform.
