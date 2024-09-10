@@ -1,0 +1,59 @@
+# :video_game: Skia Poker Project Status Update
+
+Dear **Team**,
+
+I hope this update finds you well. As we approach the final stages of our project, I wanted to provide a comprehensive overview of our progress, upcoming milestones, and the steps we need to take to ensure a successful delivery.
+
+## :green_circle: Current Status
+
+1. **Smart Contracts and Game Logic** (:green_circle:):
+   - Thanks to the dedicated efforts of our team, the **smart contract development**, **Chainlink integration**, and overall **game logic implementation** are on track and progressing smoothly.
+
+2. **UI/UX and Web3Auth Integration** (:orange_circle:):
+   - The **UI/UX** and **Web3Auth** components are currently in progress, with work assigned to the respective team members.
+   - However, there is some ambiguity in the timeline due to school exams for the individuals responsible for these tasks.
+   - We have scheduled a meeting on **September 1st** at **12:30 ET** to review the status and clarify any uncertainties.
+
+## :date: Upcoming Milestones Part 1
+
+1. **Code Cleanup and Shared Library Integration** (**August 31st - September 2nd**):
+   - Before pushing our code to the **Galadriel** and **Morph** test environments, we need to clean up the existing codebase and finalize the interface contracts.
+   - We will create a shared library that will be utilized by Tetiana's and CoolMan's contracts, promoting code reusability and maintainability.
+
+2. **Unit Testing** (**September 3rd - September 4th**):
+   - Once the code cleanup and shared library integration are complete, we will conduct thorough **unit testing** to ensure the stability and reliability of our smart contracts.
+   - After successful testing, we will be ready to deploy our code to the test environments.
+
+## :date: Upcoming Milestones Part 2
+
+3. **:dart: *PRD1* Deadline** (**September 4th**):
+   - We are aiming to meet the **:dart: *PRD1* deadline** by **September 4th**.
+   - If time permits, we will explore the possibility of incorporating additional features, such as **Glitch Prophet** in our code and **XMTP messaging** for the waiting room (**:rocket: *PRD2***).
+   - However, even if we cannot include these features in the MVP, we will ensure they are represented in our **UI/UX designs**.
+
+4. **:projector: Video Demo and Final Preparations** (**September 7th**):
+   - By **September 7th**, we aim to have a polished **video demo** showcasing our project's functionality and unique features.
+   - This will require all components to be fully integrated and tested by **September 6th**, allowing us time to prepare the demo and make any final adjustments.
+
+## :white_check_mark: Action Items
+
+1. **Tetiana and CoolMan**:
+   - Please review the **code cleanup** and **shared library integration plan** and provide any feedback or concerns you may have.
+   - Be prepared to assist with the **unit testing** process once the code is ready.
+
+2. **@harshalbhangale and @fakename3976**:
+   - During our meeting on **September 1st**, please provide a clear update on the progress of the **UI/UX** and **Web3Auth** components.
+   - If there are any blockers or challenges, let's discuss them openly and find solutions together.
+   - Ensure that the **UI/UX designs** incorporate the additional features (**Glitch Prophet** and **XMTP messaging**) even if they are not implemented in the MVP.
+
+3. **All Team Members**:
+   - Please communicate any issues, concerns, or suggestions you have throughout this process.
+   - If you encounter any blockers or need assistance, don't hesitate to reach out to me or the rest of the team.
+   - Let’s maintain a collaborative and supportive environment as we work towards our common goal.
+
+I want to express my gratitude for your hard work and dedication thus far. Together, we have made significant strides, and I am confident that we will deliver an outstanding project. :pray_tone4:
+
+If you have any questions or need further clarification, please let me know. I am here to support you in any way I can.
+
+Best regards,
+Pete
