@@ -3,15 +3,10 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./Common.sol";
 
 contract UserManagement is Ownable, AccessControl {
     bytes32 public constant GAME_CONTRACT_ROLE = keccak256("GAME_CONTRACT_ROLE");
-
-    struct User {
-        address userAddress;
-        string username;
-        uint256 balance;
-    }
 
     mapping(address => User) public users;
 
@@ -19,49 +14,59 @@ contract UserManagement is Ownable, AccessControl {
     event BalanceUpdated(address indexed user, uint256 newBalance);
 
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(GAME_CONTRACT_ROLE, msg.sender);
     }
 
-    /**
-     * @dev Registers a new user with an initial balance.
-     * @param _username The username of the user.
-     */
     function registerUser(string calldata _username) external payable {
-        require(bytes(users[msg.sender].username).length == 0, "User already registered");
-        require(msg.value > 0, "Initial balance must be greater than 0");
+        require(bytes(_username).length > 0, "Username cannot be empty");
+        require(!users[msg.sender].isRegistered, "User already registered");
 
-        users[msg.sender] = User({
-            userAddress: msg.sender,
-            username: _username,
-            balance: msg.value
-        });
+        users[msg.sender].userAddress = msg.sender;
+        users[msg.sender].username = _username;
+        users[msg.sender].balance = msg.value;
+        users[msg.sender].isRegistered = true;
 
         emit UserRegistered(msg.sender, _username);
         emit BalanceUpdated(msg.sender, msg.value);
     }
 
-    /**
-     * @dev Updates the balance of a user (can only be called by authorized entities).
-     * @param user The address of the user.
-     * @param amount The amount to add or subtract from the user's balance.
-     */
-
-    function decreaseBalance(address user, uint256 amount) public onlyRole(GAME_CONTRACT_ROLE) {
-        require(users[user].balance >= amount, "Insufficient balance");
-        users[user].balance -= amount;
-        emit BalanceUpdated(user, users[user].balance);
+    function isUserRegistered(address _user) external view returns (bool) {
+        return users[_user].isRegistered;
     }
 
-    function increaseBalance(address user, uint256 amount) public onlyRole(GAME_CONTRACT_ROLE) {
-        users[user].balance += amount;
-        emit BalanceUpdated(user, users[user].balance);
+    function getUsernameOrAddress(address _user) external view returns (string memory) {
+        if (users[_user].isRegistered) {
+            return users[_user].username;
+        } else {
+            return addressToString(_user);
+        }
     }
 
-    /**
-     * @dev Withdraws funds from the caller's account.
-     * @param _amount The amount to withdraw.
-     */
-    function withdraw(uint256 _amount) external {
+    function userLeftRoom(address _user) external {
+        users[_user].isJoined = false;
+    }
+
+    function addressToString(address _addr) internal pure returns (string memory) {
+        bytes32 value = bytes32(uint256(uint160(_addr)));
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(42);
+        str[0] = '0';
+        str[1] = 'x';
+        for (uint256 i = 0; i < 20; i++) {
+            str[2+i*2] = alphabet[uint8(value[i + 12] >> 4)];
+            str[3+i*2] = alphabet[uint8(value[i + 12] & 0x0f)];
+        }
+        return string(str);
+    }
+
+    function updateBalance(address _user, uint256 _amount) external onlyRole(GAME_CONTRACT_ROLE) {
+        require(users[_user].balance + _amount >= users[_user].balance, "Overflow error");
+        users[_user].balance += _amount;
+
+        emit BalanceUpdated(_user, users[_user].balance);
+    }
+
+    function withdraw(uint256 _amount) external onlyOwner {
         require(users[msg.sender].balance >= _amount, "Insufficient balance");
         users[msg.sender].balance -= _amount;
         payable(msg.sender).transfer(_amount);
@@ -69,25 +74,14 @@ contract UserManagement is Ownable, AccessControl {
         emit BalanceUpdated(msg.sender, users[msg.sender].balance);
     }
 
-    /**
-     * @dev Retrieves the profile of a user.
-     * @param _user The address of the user.
-     * @return username The username of the user.
-     * @return balance The balance of the user.
-     */
-    function getUserProfile(address _user) external view returns (string memory username, uint256 balance) {
-        User memory user = users[_user];
-        return (user.username, user.balance);
+    function getUserNickName(address _user) external view returns (string memory) {
+        return users[_user].username;
     }
 
-    function getUserBalance(address user) public view returns (uint256) {
-        return users[user].balance;
+    function getUserBalance(address _user) external view returns (uint256) {
+        return users[_user].balance;
     }
 
-    /**
-     * @dev Grants GAME_CONTRACT_ROLE to an address.
-     * @param account The address to grant the role to.
-     */
     function grantGameContractRole(address account) public onlyOwner {
         grantRole(GAME_CONTRACT_ROLE, account);
     }
